@@ -120,6 +120,33 @@ class RoomBatchBroadcasterTest {
         } finally {workers.shutdownNow();}
     }
 
+    @Test void eachEventLoopReceivesBatchesInOrderWithMembershipAtDispatch() throws Exception {
+        start(1,16384);
+        var first=join(99);
+        var second=join(99);
+
+        broadcasts.append(99,item(1,"before membership changes"));
+        assertTrue(first.outboundMessages().isEmpty());
+        assertTrue(second.outboundMessages().isEmpty());
+        var late=join(99);
+        broadcasts.leave(99,second);
+        broadcasts.append(99,item(2,"after membership changes"));
+
+        assertEquals(List.of("1","2"),ids(frames(first)));
+        assertEquals(List.of("1"),ids(frames(second)));
+        assertEquals(List.of("2"),ids(frames(late)));
+    }
+
+    @Test void closedViewerIsRemovedWithoutAnExplicitLeave() throws Exception {
+        start(1,16384);
+        var viewer=join(99);
+        viewer.close();
+        viewer.runPendingTasks();
+        assertEquals(0,broadcasts.roomCount());
+        broadcasts.append(99,item(1,"no viewers"));
+        assertTrue(frames(viewer).isEmpty());
+    }
+
     @Test void emptyRoomsAndOversizedItemsCannotBuildUnboundedPendingWork() throws Exception {
         start(50,4096);broadcasts.append(99,item(1,"no viewers"));assertTrue(timers.isEmpty());
         var viewer=join(99);

@@ -262,7 +262,12 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<TextWebSocketF
     }
     private void error(ChannelHandlerContext ctx, String text) { reply(ctx, WebSocketConstant.ERROR_MESSAGE, text); }
     private void reply(ChannelHandlerContext ctx, int type, Object data) {
-        ctx.writeAndFlush(new TextWebSocketFrame(message(type, data)));
+        // An inline reply must not overtake a broadcast already queued on the socket loop.
+        try {
+            ctx.channel().eventLoop().execute(() -> ctx.writeAndFlush(new TextWebSocketFrame(message(type, data))));
+        } catch (RejectedExecutionException stopped) {
+            // The socket loop is shutting down.
+        }
     }
 
     @Override

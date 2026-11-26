@@ -5,10 +5,13 @@ import com.orangecode.tianmu.common.DanmakuMetrics;
 import cn.hutool.json.JSONUtil;
 import com.orangecode.tianmu.constants.WebSocketConstant;
 import com.orangecode.tianmu.model.vo.bullet.OnlineBulletResponse;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
-import io.netty.channel.group.*;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
-import io.netty.util.concurrent.GlobalEventExecutor;
+import io.netty.util.concurrent.Future;
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** One bounded pending batch and at most one timer per active room. */
 @Component
@@ -66,7 +70,8 @@ public class RoomBatchBroadcaster implements AutoCloseable {
     private static final class Room {
         final long id;
         Room(long id) { this.id = id; }
-        final ChannelGroup channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
+        final Map<Channel, Shard> members = new HashMap<>();
+        final Map<EventLoop, Shard> shards = new LinkedHashMap<>();
         final List<Pending> pending = new ArrayList<>();
         int bytes = ENVELOPE_BYTES;
         long generation;
@@ -75,28 +80,122 @@ public class RoomBatchBroadcaster implements AutoCloseable {
         boolean disposed;
     }
 
+    private static final class Shard {
+        final EventLoop loop;
+        // Only this EventLoop reads or mutates the recipient set.
+        final Set<Channel> channels = new LinkedHashSet<>();
+        // The room lock protects the count used at scheduling time.
+        int viewers;
+
+        Shard(EventLoop loop) {
+            this.loop = loop;
+        }
+
+        void write(byte[] payload, Broadcast batch) {
+            var frame = new TextWebSocketFrame(Unpooled.wrappedBuffer(payload));
+            var completion = batch == null ? null : new ShardWrite(batch);
+            try {
+                for (Channel channel : channels) {
+                    if (completion == null) {
+                        channel.writeAndFlush(frame.retainedDuplicate(), channel.voidPromise());
+                    } else {
+                        completion.write(channel, frame);
+                    }
+                }
+            } finally {
+                frame.release();
+                if (completion != null) completion.finish();
+            }
+        }
+
+        void closeChannels() {
+            for (Channel channel : channels) channel.close();
+            channels.clear();
+        }
+    }
+
+    private static final class ShardWrite implements ChannelFutureListener {
+        private final Broadcast batch;
+        private int pending = 1, blocked, failed;
+
+        ShardWrite(Broadcast batch) {
+            this.batch = batch;
+        }
+
+        void write(Channel channel, TextWebSocketFrame frame) {
+            if (!channel.isWritable()) blocked++;
+            pending++;
+            channel.writeAndFlush(frame.retainedDuplicate()).addListener(this);
+        }
+
+        @Override public void operationComplete(ChannelFuture future) {
+            if (!future.isSuccess()) failed++;
+            finish();
+        }
+
+        void finish() {
+            if (--pending == 0) batch.shardDone(blocked, failed);
+        }
+    }
+
     public void join(long roomId, Channel channel) {
         rooms.compute(roomId, (id, previous) -> {
-            if (closed.get()) throw new IllegalStateException("Room broadcaster is closed");
             Room room = previous == null ? new Room(roomId) : previous;
             synchronized (room) {
-                room.channels.add(channel);
-                // Newcomer gets an immediate snapshot; existing viewers get one coalesced update.
-                channel.writeAndFlush(new TextWebSocketFrame("{\"type\":1,\"data\":" + room.channels.size() + "}"));
-                if (room.channels.size() > 1) scheduleOnline(room);
+                if (closed.get() || room.disposed) throw new IllegalStateException("Room broadcaster is closed");
+                Shard existing = room.members.get(channel);
+                Shard shard = existing == null ? room.shards.computeIfAbsent(channel.eventLoop(), Shard::new) : existing;
+                int viewers = room.members.size() + (existing == null ? 1 : 0);
+                if (existing == null) {
+                    room.members.put(channel, shard);
+                    shard.viewers++;
+                }
+                // Join, leave and batch tasks enter each EventLoop in room order.
+                try {
+                    shard.loop.execute(() -> {
+                        if (existing == null) {
+                            shard.channels.add(channel);
+                            channel.closeFuture().addListener(ignored -> leave(roomId, channel));
+                        }
+                        channel.writeAndFlush(new TextWebSocketFrame(onlineMessage(viewers)), channel.voidPromise());
+                    });
+                } catch (RejectedExecutionException stopped) {
+                    if (existing == null) removeMember(room, channel);
+                    throw stopped;
+                }
+                if (viewers > 1) scheduleOnline(room);
             }
             return room;
         });
+        // A new room can race the shutdown walk before compute publishes it.
+        if (closed.get()) {
+            leave(roomId, channel);
+            channel.close();
+        }
+    }
+
+    private static Shard removeMember(Room room, Channel channel) {
+        Shard shard = room.members.remove(channel);
+        if (shard != null && --shard.viewers == 0) room.shards.remove(shard.loop);
+        return shard;
     }
 
     public void leave(long roomId, Channel channel) {
         rooms.computeIfPresent(roomId, (id, room) -> {
             synchronized (room) {
-                room.channels.remove(channel);
-                if (room.channels.isEmpty()) {
+                if (room.disposed) return null;
+                Shard shard = removeMember(room, channel);
+                if (shard == null) return room;
+                try {
+                    shard.loop.execute(() -> shard.channels.remove(channel));
+                } catch (RejectedExecutionException stopped) {
+                    // The loop cannot send any more, and room membership is already updated.
+                }
+                if (room.members.isEmpty()) {
                     discard(room); cancelOnline(room); room.disposed = true; return null;
                 }
-                scheduleOnline(room); return room;
+                if (!closed.get()) scheduleOnline(room);
+                return room;
             }
         });
     }
@@ -159,26 +258,57 @@ public class RoomBatchBroadcaster implements AutoCloseable {
                 DanmakuMetrics.observe(DanmakuMetrics.Stage.BATCH_WAIT, flushStarted - pending.timing().enqueued());
             }
         }
-        var payload = new TextWebSocketFrame(frame.toString());
+        byte[] payload = frame.toString().getBytes(StandardCharsets.UTF_8);
         discard(room);
         DanmakuMetrics.frames.increment();
-        int viewers = room.channels.size();
-        DanmakuMetrics.recipients.add(viewers);
-        int blocked = 0;
-        for (Channel channel : room.channels) if (!channel.isWritable()) blocked++;
-        DanmakuMetrics.nonWritable.add(blocked);
-        long dispatchStarted = System.nanoTime();
-        DanmakuMetrics.observe(DanmakuMetrics.Stage.FLUSH_PREPARE, dispatchStarted - flushStarted);
-        var future = room.channels.writeAndFlush(payload);
-        long dispatchDone = System.nanoTime();
-        DanmakuMetrics.observe(DanmakuMetrics.Stage.FLUSH_DISPATCH, dispatchDone - dispatchStarted);
-        long roomId = room.id;
-        int nonWritable = blocked;
-        future.addListener((ChannelGroupFutureListener) completed -> {
+        DanmakuMetrics.recipients.add(room.members.size());
+        var batch = new Broadcast(room, timings, flushStarted, items, bytes);
+        for (Shard shard : room.shards.values()) {
+            try {
+                shard.loop.execute(() -> shard.write(payload, batch));
+            } catch (RejectedExecutionException stopped) {
+                batch.shardDone(0, shard.viewers);
+            }
+        }
+        batch.enqueued();
+    }
+
+    private static final class Broadcast {
+        final long roomId, flushStarted, dispatchStarted = System.nanoTime();
+        final int items, bytes, viewers;
+        final List<BroadcastTiming> timings;
+        final AtomicInteger remaining, blocked = new AtomicInteger(), failed = new AtomicInteger();
+        long dispatchDone;
+
+        Broadcast(Room room, List<BroadcastTiming> timings, long flushStarted, int items, int bytes) {
+            this.roomId = room.id;
+            this.flushStarted = flushStarted;
+            this.timings = timings;
+            this.items = items;
+            this.bytes = bytes;
+            this.viewers = room.members.size();
+            this.remaining = new AtomicInteger(room.shards.size() + 1);
+            DanmakuMetrics.observe(DanmakuMetrics.Stage.FLUSH_PREPARE, dispatchStarted - flushStarted);
+        }
+
+        void enqueued() {
+            dispatchDone = System.nanoTime();
+            DanmakuMetrics.observe(DanmakuMetrics.Stage.FLUSH_DISPATCH, dispatchDone - dispatchStarted);
+            complete();
+        }
+
+        void shardDone(int nonWritable, int failures) {
+            blocked.addAndGet(nonWritable);
+            failed.addAndGet(failures);
+            complete();
+        }
+
+        private void complete() {
+            if (remaining.decrementAndGet() != 0) return;
             long done = System.nanoTime();
-            int failed = 0;
-            for (var result : completed) if (!result.isSuccess()) failed++;
-            DanmakuMetrics.writeFailures.add(failed);
+            int nonWritable = blocked.get(), failedWrites = failed.get();
+            DanmakuMetrics.nonWritable.add(nonWritable);
+            DanmakuMetrics.writeFailures.add(failedWrites);
             DanmakuMetrics.observe(DanmakuMetrics.Stage.BROADCAST_WRITE, done - dispatchStarted);
             for (BroadcastTiming timing : timings) {
                 SendTiming send = timing.send();
@@ -193,10 +323,10 @@ public class RoomBatchBroadcaster implements AutoCloseable {
                             ms(send.orderWaitNanos()), ms(send.authNanos()), ms(send.videoNanos()), ms(send.mqDone() - send.mqStarted()),
                             ms(timing.enqueued() - send.mqDone()), ms(flushStarted - timing.enqueued()),
                             ms(dispatchStarted - flushStarted), ms(dispatchDone - dispatchStarted),
-                            ms(done - dispatchStarted), ms(elapsed), items, bytes, viewers, nonWritable, failed);
+                            ms(done - dispatchStarted), ms(elapsed), items, bytes, viewers, nonWritable, failedWrites);
                 }
             }
-        });
+        }
     }
 
     private static long ms(long nanos) {
@@ -209,9 +339,20 @@ public class RoomBatchBroadcaster implements AutoCloseable {
         room.timer = null; room.pending.clear(); room.bytes = ENVELOPE_BYTES;
     }
 
+    private static String onlineMessage(int viewers) {
+        return "{\"type\":1,\"data\":" + viewers + "}";
+    }
+
     private void online(Room room) {
         DanmakuMetrics.onlineFrames.increment();
-        room.channels.writeAndFlush(new TextWebSocketFrame("{\"type\":1,\"data\":" + room.channels.size() + "}"));
+        byte[] payload = onlineMessage(room.members.size()).getBytes(StandardCharsets.UTF_8);
+        for (Shard shard : room.shards.values()) {
+            try {
+                shard.loop.execute(() -> shard.write(payload, null));
+            } catch (RejectedExecutionException stopped) {
+                // A stopped EventLoop has no live viewers for this update.
+            }
+        }
     }
 
     private void scheduleOnline(Room room) {
@@ -233,10 +374,25 @@ public class RoomBatchBroadcaster implements AutoCloseable {
     @Override @PreDestroy
     public void close() {
         if (!closed.compareAndSet(false, true)) return;
+        var closing = new ArrayList<Future<?>>();
         for (Room room : rooms.values()) {
-            synchronized (room) { flush(room); discard(room); cancelOnline(room); room.disposed = true; }
-            room.channels.close().awaitUninterruptibly();
+            synchronized (room) {
+                flush(room);
+                discard(room);
+                cancelOnline(room);
+                room.disposed = true;
+                for (Shard shard : room.shards.values()) {
+                    try {
+                        Future<?> close = shard.loop.submit(shard::closeChannels);
+                        if (!shard.loop.inEventLoop()) closing.add(close);
+                    } catch (RejectedExecutionException stopped) {
+                        // The EventLoop already owns closing its remaining channels.
+                    }
+                }
+            }
         }
-        rooms.clear(); scheduler.shutdownNow();
+        rooms.clear();
+        scheduler.shutdownNow();
+        closing.forEach(Future::awaitUninterruptibly);
     }
 }
