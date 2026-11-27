@@ -36,6 +36,8 @@ public class ToolDispatcher {
     @org.springframework.beans.factory.annotation.Autowired(required=false) private com.tianmu.agent.access.IdentityPort identity;
     private final com.tianmu.agent.runtime.store.ConversationStore conversations;
     private com.tianmu.agent.feedback.FeedbackAnalysisService feedback;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.tianmu.agent.runtime.spi.ToolArgumentObserver argumentObserver;
     @org.springframework.beans.factory.annotation.Autowired(required=false) private com.tianmu.agent.feedback.FeedbackPreparationService preparation;
     @org.springframework.beans.factory.annotation.Autowired
     void feedbackService(com.tianmu.agent.feedback.FeedbackAnalysisService feedback){this.feedback=feedback;}
@@ -95,9 +97,23 @@ public class ToolDispatcher {
     public static final class BatchAdmissionRejected extends AgentException {
         public BatchAdmissionRejected(){super("INVALID_TOOL_BATCH","Run tools from different suspension groups in separate model turns; do not repeat this mixed batch.");}
     }
+    /**
+     * One named member of the batch failed its declared schema. The member and the exact
+     * validation that decided the refusal travel with the exception, so no caller has to
+     * re-inspect the batch and no group-level refusal is ever attributed to a single tool.
+     */
     public static final class BatchInputRejected extends AgentException {
-        public BatchInputRejected(){super("INVALID_ARGUMENTS","Correct the arguments using the declared tool schema; no handler has executed.");}
+        private final String tool;
+        private final ToolArguments.Validation validation;
+        public BatchInputRejected(String tool,ToolArguments.Validation validation){
+            super("INVALID_ARGUMENTS","Correct the arguments using the declared tool schema; no handler has executed.");
+            this.tool=tool;this.validation=validation;
+        }
+        public String tool(){return tool;}
+        public ToolArguments.Validation validation(){return validation;}
     }
+    /** Fixed placeholder for a whole-group refusal; it can never collide with a registered name. */
+    public static final String BATCH_GROUP_TOOL="*batch*";
     public void checkBatch(List<ToolCall> calls,RunState run) {
         if(calls.size()<2 || calls.size()>4)throw new AgentException("INVALID_DECISION","Native read batch must contain two to four calls");
         Set<ToolCall> unique=new HashSet<>();
@@ -106,7 +122,8 @@ public class ToolDispatcher {
             var tool=registry.admit(call.name(),run.execution().activeSkills(),snapshotTools(run));
             if(!tool.batchable() || !unique.add(new ToolCall(call.name(),call.arguments())))
                 throw new AgentException("INVALID_DECISION","Only distinct independent reads can share a native tool batch");
-            if(!ToolArguments.inspect(call,registry.definition(call.name())).valid())throw new BatchInputRejected();
+            var validation=ToolArguments.inspect(call,registry.definition(call.name()));
+            if(!validation.valid())throw new BatchInputRejected(call.name(),validation);
         }
         if(calls.stream().anyMatch(c->registry.get(c.name()).suspensionGroup()!=null)) {
             if(calls.stream().map(ToolCall::name).distinct().count()!=calls.size())
@@ -205,20 +222,33 @@ public class ToolDispatcher {
         run.checkpoint();
         if (!permitted(call.name(), run)) throw new AgentException("TASK_CONSTRAINT_VIOLATION", "Tool is outside the frozen source selection");
         AgentTool tool = registry.admit(call.name(), run.execution().activeSkills(), snapshotTools(run));
+        String layer = "NORMALIZE";
+        boolean handlerExecuted = false;
         try {
             var span = io.opentelemetry.api.trace.Span.current();
             com.tianmu.agent.harness.trace.TraceAttributes.apply(span, Map.of("tool.call_id", span.getSpanContext().getSpanId()));
             TraceDetails.capture("input", call, "TOOL_ARGUMENTS");
             com.tianmu.agent.harness.trace.TraceAttributes.apply(span,Map.of("tool.handler_executed",false));
             ToolCall normalized=tool.normalize(call);
+            layer="SCHEMA";
             var validation=ToolArguments.inspect(normalized,registry.definition(call.name()));
             run.checkpoint();
-            if(!validation.valid())return new ValidationRejected(validation);
+            if(!validation.valid()){
+                rejected(run,call.name(),layer,"SCHEMA",validation,false);
+                return new ValidationRejected(validation);
+            }
             var context=new HostContext(run,tool);
+            layer="PREFLIGHT";
             validation=tool.preflight(normalized,context);
-            if(!validation.valid())return new ValidationRejected(validation);
+            if(!validation.valid()){
+                rejected(run,call.name(),layer,"PREFLIGHT",validation,false);
+                return new ValidationRejected(validation);
+            }
+            layer="HANDLER";
             com.tianmu.agent.harness.trace.TraceAttributes.apply(span,Map.of("tool.handler_executed",true));
+            handlerExecuted=true;
             ToolResult result = tool.execute(normalized, context);
+            layer="RESULT";
             run.checkpoint();
             if (result == null || !call.name().equals(result.tool()) || result.data().containsKey("input_validation") || result.data().containsKey("batch_validation")
                     || result.terminalClarification()!=null && !call.name().equals("ask_clarification"))
@@ -227,9 +257,40 @@ public class ToolDispatcher {
             for(String id:result.additionalEvidenceIds())context.evidence(id);
             if(result.pending()!=null && operations!=null)operations.getObject().require(result.pending().kind());
             return new Completed(result);
+        } catch (AgentException e) {
+            if ("INVALID_ARGUMENTS".equals(e.code()))
+                rejected(run,call.name(),layer,"DECLARED_INVALID_ARGUMENTS",null,handlerExecuted);
+            throw e;
         } catch (IllegalArgumentException | DateTimeException | ArithmeticException e) {
+            rejected(run,call.name(),layer,failureClass(e),null,handlerExecuted);
             throw new AgentException("INVALID_ARGUMENTS", "Tool arguments are invalid");
         }
+    }
+    /**
+     * Fixed-enum, declared-path-only record of a tool-argument rejection. Called at the point the
+     * rejection is decided, so an evaluator observer can persist it before any stop returns; the
+     * observer is a no-op unless one is installed and never changes this method's outcome.
+     */
+    private void rejected(RunState run,String tool,String phase,String failureClass,
+                                 ToolArguments.Validation validation,boolean handlerExecuted) {
+        var observer = argumentObserver != null ? argumentObserver
+                : com.tianmu.agent.runtime.spi.ToolArgumentObserver.installed();
+        if (observer == null) return;
+        try {
+            observer.rejected(new com.tianmu.agent.runtime.spi.ToolArgumentObserver.Rejection(
+                    run.id.toString(), run.execution().exchanges().size(), tool, phase, "INVALID_ARGUMENTS",
+                    validation==null?List.of():ToolArguments.diagnosticPaths(validation),
+                    validation==null?List.of():validation.issues().stream().map(issue->issue.code().name()).toList(),
+                    validation==null?0:validation.issues().size(),
+                    validation!=null && validation.truncated(), failureClass, handlerExecuted));
+        } catch (RuntimeException ignored) {
+            // Observation must never replace the tool error being reported.
+        }
+    }
+    private static String failureClass(RuntimeException failure) {
+        if (failure instanceof DateTimeException) return "DATE_TIME";
+        if (failure instanceof ArithmeticException) return "ARITHMETIC";
+        return "ILLEGAL_ARGUMENT";
     }
     private final class HostContext implements ToolContext {
         private final RunState run; private final AgentTool tool;

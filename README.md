@@ -282,6 +282,7 @@ npm run build
 | [前端开发](front/README.md) | 页面、Trace Studio、代理与构建 |
 | [Agent 开发](agent/README.md) | 模型、工具、存储与配置 |
 | [Agent 治理与文档索引](agent/docs/README.md) | 当前架构、配置目录、开发维护、验收与独立审查 |
+| [离线评测](docs/evaluation/offline-evaluation.md) | 合成材料、报告参数、费用账本、停发与离线入口 |
 | [网站部署](deploy/site/README.md) / [独立 Agent 部署](deploy/README.md) | 容器与环境配置 |
 | [部署参考](docs/DEPLOYMENT.md) | 环境与集成测试 |
 | [项目路线图](docs/ROADMAP.md) | 开发方向与待完善能力 |

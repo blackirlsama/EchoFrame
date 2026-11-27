@@ -1,0 +1,50 @@
+{
+  "schema_version" : 1,
+  "bundle_id" : "product-needs-input",
+  "adapter_contract" : "product-bundle-v1",
+  "evidence_level" : "product_http_mockmvc",
+  "material_class" : "synthetic_fixture",
+  "producer" : {
+    "kind" : "product_http_mockmvc",
+    "test_class" : "com.tianmu.agent.feedback.ReportEvaluationBridgeHttpTest",
+    "test_method" : "product-needs-input",
+    "maven_command" : "mvn -o -f agent/pom.xml -Dspring.profiles.active=demo -Dtest=ReportEvaluationBridgeHttpTest test",
+    "captured_at" : "2026-11-25T02:05:54.799193200Z",
+    "spring_profile" : "demo",
+    "java_version" : "21.0.12.1"
+  },
+  "request" : {
+    "prompt" : "分析视频1001从2026-10-10到2026-10-20的评论和弹幕，生成观众反馈HTML报告，不读取视频内容",
+    "owner_token" : "demo-alice",
+    "video_id" : "1001",
+    "sources" : [ "COMMENT", "DANMAKU" ],
+    "grounding" : "FEEDBACK_ONLY"
+  },
+  "notes" : [ "MockMvc contract capture; no HTTP server started, no real model, no formal material.", "ModelPort is a Mockito mock, so no dispatched model.request spans exist; token usage stays unknown.", "The product limits explicit ranges to the previous 30 days; the submit-time business clock is pinned to 2026-11-21 so reruns keep the same window." ],
+  "responses" : {
+    "json" : null,
+    "html" : null
+  },
+  "access_checks" : [ ],
+  "run" : {
+    "run_id" : "cb21b138-1449-4f36-a80a-7a18e1d38c91",
+    "final_status" : "NEEDS_INPUT",
+    "clarification" : "请明确一个本人视频及有效时间区间；未指定时默认全量弹幕和评论。",
+    "error_code" : null,
+    "artifact_id" : null,
+    "evidence_id" : null,
+    "receipt_tool" : null,
+    "receipt" : null,
+    "json_url" : null,
+    "html_url" : null
+  },
+  "trace" : {
+    "path" : "traces/spans.jsonl",
+    "sha256" : "bf59131b95b5e21557b9de9a55f22d0585933213a92dcfd242a4d22112666b67",
+    "bytes" : 28751,
+    "span_count" : 17,
+    "run_id" : "cb21b138-1449-4f36-a80a-7a18e1d38c91",
+    "source" : "harness_jsonl_archive",
+    "root_span_observed" : true
+  }
+}

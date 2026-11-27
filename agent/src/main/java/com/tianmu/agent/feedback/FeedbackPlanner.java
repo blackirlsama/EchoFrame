@@ -54,7 +54,7 @@ public final class FeedbackPlanner {
         }
     }
     public ResultNode validate(String workId,Input input,List<Proposal> proposals) {
-        if(proposals==null || proposals.size()>(input.kind()==WorkKind.CLASSIFY?10:100))throw new AgentException("INVALID_ANALYSIS","Too many or missing topics");
+        if(proposals==null || proposals.size()>(input.kind()==WorkKind.CLASSIFY?10:100))throw new AgentException("INVALID_ANALYSIS","Planner rejected: TOPIC_COUNT");
         Map<String,long[]> members=new LinkedHashMap<>();
         if(input.kind()==WorkKind.CLASSIFY)for(Group g:input.groups()){
             if(g.messages()!=g.originalIds().size() || g.messages()<1 || members.put(g.id(),new long[]{g.messages(),g.author()?g.messages():0})!=null)throw new AgentException("STORAGE_CORRUPT","Invalid classification input");
@@ -92,6 +92,6 @@ public final class FeedbackPlanner {
             }
             if(!covered.equals(members.keySet()))throw new IllegalArgumentException();
             return new ResultNode(workId,input.kind(),topics,topics.stream().mapToLong(Topic::messages).sum(),topics.stream().mapToLong(Topic::authorMessages).sum());
-        } catch(IllegalArgumentException|ArithmeticException invalid){throw new AgentException("INVALID_ANALYSIS","Every batch group or child topic must be assigned exactly once with valid bounded observations");}
+        } catch(IllegalArgumentException|ArithmeticException invalid){throw new AgentException("INVALID_ANALYSIS","Planner rejected: ASSIGNMENT_COVERAGE");}
     }
 }

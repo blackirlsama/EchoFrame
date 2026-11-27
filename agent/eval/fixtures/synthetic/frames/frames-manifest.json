@@ -1,0 +1,110 @@
+{
+  "kind": "formal-frame-manifest",
+  "generated_at": "2026-11-25T00:00:00+00:00",
+  "source": {
+    "video_path": "eval/fixtures/synthetic/video.mp4",
+    "video_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "duration_ms": 1200000
+  },
+  "sampling": {
+    "strategy": "frame-12-window-full",
+    "count": 12,
+    "tool_config_version": "synthetic-v1",
+    "hot_segment_ms": [
+      0,
+      1000
+    ]
+  },
+  "frames": [
+    {
+      "index": 0,
+      "at_ms": 0,
+      "path": "frames/frame-00.jpg",
+      "bytes": 694,
+      "sha256": "5a0e7120ff584016f49a063bb6688a8a6c3b8d73afcf477f7b4205fdd4f05c15"
+    },
+    {
+      "index": 1,
+      "at_ms": 100000,
+      "path": "frames/frame-01.jpg",
+      "bytes": 694,
+      "sha256": "4d32484253f1107fd8765a6ed18a7779b14c512f7234bb8fec226b3b6a2722ff"
+    },
+    {
+      "index": 2,
+      "at_ms": 200000,
+      "path": "frames/frame-02.jpg",
+      "bytes": 694,
+      "sha256": "203d3d14f3a8bb85bc213f703dbb5b89a7064ff60c55763ffc5c5161ef812464"
+    },
+    {
+      "index": 3,
+      "at_ms": 300000,
+      "path": "frames/frame-03.jpg",
+      "bytes": 694,
+      "sha256": "3e198b36605e2e0c2e6f485b45ebc336af658bd44fa729e41b11c36de3190f32"
+    },
+    {
+      "index": 4,
+      "at_ms": 400000,
+      "path": "frames/frame-04.jpg",
+      "bytes": 693,
+      "sha256": "1953265add340d332f10db68dda22f4671f9203b07ce2c6048bb80311c033ae9"
+    },
+    {
+      "index": 5,
+      "at_ms": 500000,
+      "path": "frames/frame-05.jpg",
+      "bytes": 693,
+      "sha256": "4945975cdd720fe2db305a637816c63ea8af7a6c78ae0f10ef4e3761617e1ef8"
+    },
+    {
+      "index": 6,
+      "at_ms": 600000,
+      "path": "frames/frame-06.jpg",
+      "bytes": 693,
+      "sha256": "3a5803545d1b75ffe9d2e8a5d56364fb783c5a761011462d55268ee980b4888c"
+    },
+    {
+      "index": 7,
+      "at_ms": 700000,
+      "path": "frames/frame-07.jpg",
+      "bytes": 693,
+      "sha256": "8875a973df0308e0a0962d04628b2208580372daef3d96074040a9963d5598fd"
+    },
+    {
+      "index": 8,
+      "at_ms": 800000,
+      "path": "frames/frame-08.jpg",
+      "bytes": 693,
+      "sha256": "95749f8c07bf362ac5e3e3c627d4635f772278908f40c49064da394d06b8dd92"
+    },
+    {
+      "index": 9,
+      "at_ms": 900000,
+      "path": "frames/frame-09.jpg",
+      "bytes": 693,
+      "sha256": "ac2e267a5fa1d3b12816dd06f81dcfb861bac414ba6489dcd4187d05ce7913c3"
+    },
+    {
+      "index": 10,
+      "at_ms": 1000000,
+      "path": "frames/frame-10.jpg",
+      "bytes": 693,
+      "sha256": "e0efd67bee602c1f68bc16cc18b26f5dc3f50a15f481421f16c30e8854140b79"
+    },
+    {
+      "index": 11,
+      "at_ms": 1100000,
+      "path": "frames/frame-11.jpg",
+      "bytes": 693,
+      "sha256": "22535cdccc9cf102c3c1ce4be041aa6cd0599d884c5e6f57829fa887af858b12"
+    }
+  ],
+  "extractor": {
+    "ffmpeg": "synthetic",
+    "version": "synthetic",
+    "command_template": "synthetic"
+  },
+  "provenance": "synthetic 64x64 JPEG fixture; no real media"
+}

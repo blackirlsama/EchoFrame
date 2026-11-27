@@ -59,30 +59,31 @@ public final class DeepSeekFeedbackModels implements FeedbackModels {
             if(formatMarker)com.tianmu.agent.harness.trace.TraceAttributes.apply(io.opentelemetry.api.trace.Span.current(),Map.of("model.response_repaired",true));
             var rows=new LinkedHashMap<String,com.fasterxml.jackson.databind.JsonNode>();var members=new LinkedHashMap<String,List<String>>();
             for(var row:body.get("topics")){
-                if(!row.isObject())throw new IllegalArgumentException();
+                if(!row.isObject())throw new IllegalArgumentException("ROW_NOT_OBJECT");
                 if(row.has("selection")){
-                    var selection=row.get("selection");if(!selection.isObject() || selection.size()!=5 || !selection.path("representativeIds").isArray() || !selection.path("frameMs").isArray() || !selection.path("coherence").isTextual() || !selection.path("distinct").isBoolean() || !selection.path("reason").isTextual())throw new IllegalArgumentException();
-                    for(var id:selection.get("representativeIds"))if(!id.isTextual())throw new IllegalArgumentException();
-                    for(var at:selection.get("frameMs"))if(!at.isIntegralNumber() || !at.canConvertToLong())throw new IllegalArgumentException();
+                    var selection=row.get("selection");if(!selection.isObject() || selection.size()!=5 || !selection.path("representativeIds").isArray() || !selection.path("frameMs").isArray() || !selection.path("coherence").isTextual() || !selection.path("distinct").isBoolean() || !selection.path("reason").isTextual())throw new IllegalArgumentException("SELECTION_SHAPE");
+                    for(var id:selection.get("representativeIds"))if(!id.isTextual())throw new IllegalArgumentException("SELECTION_ELEMENT_TYPE");
+                    for(var at:selection.get("frameMs"))if(!at.isIntegralNumber() || !at.canConvertToLong())throw new IllegalArgumentException("SELECTION_ELEMENT_TYPE");
                 }
                 if(row.size()!=(row.has("selection")?5:4)){
-                    if(!hostCounters)throw new IllegalArgumentException();
+                    if(!hostCounters)throw new IllegalArgumentException("ROW_FIELD_COUNT");
                     var fields=row.fields();
                     while(fields.hasNext()){
                         var field=fields.next();
                         if(Set.of("key","title","observation","recommendation","selection").contains(field.getKey()))continue;
-                        if(!Set.of("messages","author_messages").contains(field.getKey()) || !field.getValue().isIntegralNumber())throw new IllegalArgumentException();
+                        if(!Set.of("messages","author_messages").contains(field.getKey()) || !field.getValue().isIntegralNumber())throw new IllegalArgumentException("ROW_COUNTER_TYPE");
                     }
                     // Model-derived counters never enter Proposal or the report; coverage is host-derived.
                     com.tianmu.agent.harness.trace.TraceAttributes.apply(io.opentelemetry.api.trace.Span.current(),Map.of("model.response_repaired",true));
                 }
-                for(String field:List.of("key","title","observation","recommendation"))if(!row.path(field).isTextual())throw new IllegalArgumentException();
-                String key=row.get("key").asText();if(rows.putIfAbsent(key,row)!=null)throw new IllegalArgumentException();members.put(key,new ArrayList<>());
+                for(String field:List.of("key","title","observation","recommendation"))if(!row.path(field).isTextual())throw new IllegalArgumentException("ROW_FIELD_TYPE");
+                String key=row.get("key").asText();if(rows.putIfAbsent(key,row)!=null)throw new IllegalArgumentException("DUPLICATE_TOPIC_KEY");members.put(key,new ArrayList<>());
             }
             var assignments=body.get("assignments").fields();
             while(assignments.hasNext()){
                 var entry=assignments.next();var value=entry.getValue();
-                if(!value.isTextual() || !members.containsKey(value.asText()))throw new IllegalArgumentException();
+                if(!value.isTextual())throw new IllegalArgumentException("ASSIGNMENT_NOT_TEXT");
+                if(!members.containsKey(value.asText()))throw new IllegalArgumentException("ASSIGNMENT_UNKNOWN_TOPIC");
                 members.get(value.asText()).add(entry.getKey());
             }
             var out=new ArrayList<Proposal>();
@@ -92,7 +93,10 @@ public final class DeepSeekFeedbackModels implements FeedbackModels {
             for(var entry:rows.entrySet()){String key=entry.getKey();var row=entry.getValue();if(!members.get(key).isEmpty())out.add(new Proposal(key,row.get("title").asText(),row.get("observation").asText(),row.get("recommendation").asText(),members.get(key),row.has("selection")?json.treeToValue(row.get("selection"),FeedbackAnalysis.Selection.class):null));}
             return List.copyOf(out);
         } catch(Exception invalid){
-            String reason=Set.of("INVALID_SCHEMA","TOPIC_LIMIT_EXCEEDED").contains(Objects.toString(invalid.getMessage(),""))?invalid.getMessage():"INVALID_TOPIC_OR_ASSIGNMENT";
+            String reason=Set.of("INVALID_SCHEMA","TOPIC_LIMIT_EXCEEDED","ROW_NOT_OBJECT","SELECTION_SHAPE",
+                    "SELECTION_ELEMENT_TYPE","ROW_FIELD_COUNT","ROW_COUNTER_TYPE","ROW_FIELD_TYPE",
+                    "DUPLICATE_TOPIC_KEY","ASSIGNMENT_NOT_TEXT","ASSIGNMENT_UNKNOWN_TOPIC")
+                    .contains(Objects.toString(invalid.getMessage(),""))?invalid.getMessage():"INVALID_TOPIC_OR_ASSIGNMENT";
             com.tianmu.agent.harness.trace.TraceAttributes.apply(io.opentelemetry.api.trace.Span.current(),Map.of("model.validation_error",reason));
             throw new AgentException("INVALID_ANALYSIS","Provider analysis validation failed: "+reason+" (max_topics="+maxTopics+")");
         }
@@ -230,7 +234,12 @@ public final class DeepSeekFeedbackModels implements FeedbackModels {
                     "duplicates",input.correction().duplicates().stream().map(id->aliases.getOrDefault(id,id)).toList(),"unknown_count",input.correction().unknown().size(),"issue",input.correction().issue()));
             if(!input.groups().isEmpty() && input.kind()==FeedbackAnalysis.WorkKind.MERGE)payload.put("previous_quality",input.correction().previousTopics().stream().filter(p->p.selection()!=null).map(p->Map.of("members",p.members().stream().map(id->aliases.getOrDefault(id,id)).toList(),"coherence",p.selection().coherence(),"distinct",p.selection().distinct())).toList());
         }
-        var result=parse(prompts.trace("feedback.pipeline",input.correction()!=null?"CORRECTION":input.kind()==FeedbackAnalysis.WorkKind.MERGE && !input.groups().isEmpty()?"REPRESENTATIVE_REVIEW":input.kind().name(),pipelineInstruction,List.of(),()->client.complete(config.analysisModel(),client.messages(pipelineInstruction,payload),config.analysisMaxTokens(),control,true)),max,true);
+        boolean plainMerge = input.kind() == FeedbackAnalysis.WorkKind.MERGE && input.groups().isEmpty();
+        String effectiveInstruction = plainMerge
+                ? pipelineInstruction + "\n\u672c\u6b21 MERGE \u7684\u786c\u6027\u4e0a\u9650\uff1atopics \u6700\u591a " + max
+                    + " \u4e2a\u5143\u7d20\u3002\u5199\u4f5c\u524d\u9650\u5b9a\u8bdd\u9898\u69fd\u4f4d\uff0c\u5199\u5b8c\u540e\u6570\u4e00\u904d\uff0c\u591a\u4e8e\u4e0a\u9650\u5219\u5148\u5f52\u5e76\u518d\u8f93\u51fa\u3002"
+                : pipelineInstruction;
+        var result=parse(prompts.trace("feedback.pipeline",input.correction()!=null?"CORRECTION":input.kind()==FeedbackAnalysis.WorkKind.MERGE && !input.groups().isEmpty()?"REPRESENTATIVE_REVIEW":input.kind().name(),effectiveInstruction,List.of(),()->client.complete(config.analysisModel(),client.messages(effectiveInstruction,payload),config.analysisMaxTokens(),control,true)),max,true);
         if(childIds.isEmpty())return result;
         return result.stream().map(p->new Proposal(p.key(),p.title(),p.observation(),p.recommendation(),
                 p.members().stream().map(id->childIds.getOrDefault(id,id)).toList(),p.selection())).toList();

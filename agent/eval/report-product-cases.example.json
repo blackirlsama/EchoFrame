@@ -1,0 +1,156 @@
+{
+  "kind": "report-eval-cases",
+  "notes": [
+    "Synthetic draft cases for the 4A product capture bridge. Evidence level is product_http_mockmvc: MockMvc contract capture, no HTTP server started, no real model, no formal material.",
+    "Each case binds one real capture produced by agent/src/test/java/com/tianmu/agent/feedback/ReportEvaluationBridgeHttpTest.java. Rebuild the captures before importing.",
+    "The product refuses explicit ranges older than 30 days and the task clock is not injectable in this slice, so the delivered window is 2026-11-05..2026-11-12 and the refused-range case keeps its own older window.",
+    "material.content declares the fixture the Java test injects through a mocked FeedbackSnapshotPort; the product does not read this text from disk.",
+    "Semantic quality stays NOT_ASSESSED and review.status stays pending; nothing here is a human-approved scoring case."
+  ],
+  "cases": [
+    {
+      "case_id": "product-success-1001",
+      "case_version": "0.1.0",
+      "scenario_id": "product_capture_success",
+      "prompt": "分析视频1001从2026-11-05到2026-11-12的评论和弹幕，生成观众反馈HTML报告，不读取视频内容",
+      "report_scope": "FEEDBACK_ONLY",
+      "source_group": "demo_fixture_group",
+      "material_class": "synthetic_fixture",
+      "material": {
+        "kind": "synthetic_inline",
+        "content": "ReportEvaluationBridgeHttpTest#script injects the feedback fixture through a mocked FeedbackSnapshotPort: video 1001, 20 COMMENT + 20 DANMAKU units, texts '1'..'20', first comment expression 背景音乐盖住了人声, first danmaku expression 声音太小听不清楚, userIds viewer1..viewer20, timestamp = window end minus 1 second, danmaku playback 1000ms, first unit likes 120 and the rest 1. The empty capture injects zero units. The product reads this injected fixture, not a file on disk.",
+        "content_sha256": "9680c7bb1d0d565fbb7c3fd983912b4291acade00147da07e2183ccdf0e69b3d",
+        "provenance": "injected_by_test_mock"
+      },
+      "task_clock": {"reference_time": "2026-11-12 10:00:00", "timezone": "Asia/Shanghai"},
+      "timezone": "Asia/Shanghai",
+      "task_window": {"kind": "absolute", "start": "2026-11-05", "end": "2026-11-12"},
+      "expected": {
+        "facts": [],
+        "evidence_anchors": [],
+        "timestamp_tolerance_ms": null,
+        "prohibited_claims": ["真实平台用户行为", "真实模型输出质量", "已启动HTTP服务", "正式素材接入"]
+      },
+      "review": {"reviewer_ref": null, "reviewed_at": null, "status": "pending"},
+      "roles": {
+        "controller": "demo-scripted",
+        "feedback_analysis": "demo-scripted",
+        "vision": "not_enabled",
+        "transcription": "not_enabled",
+        "protocol": "product_compressed"
+      },
+      "interaction_script": {"clarification_replies": []},
+      "tool_permissions": {"read_dataset": false, "network": false, "ssh": false},
+      "cache_replay_policy": {"cache": "disabled", "replay": "not_implemented"},
+      "scoring_rules_version": "draft-v0",
+      "product_capture": {
+        "bundle_id": "product-success",
+        "evidence_level": "product_http_mockmvc",
+        "adapter_version": "product-adapter-v1",
+        "request": {
+          "prompt": "分析视频1001从2026-11-05到2026-11-12的评论和弹幕，生成观众反馈HTML报告，不读取视频内容",
+          "owner_token": "demo-alice",
+          "video_id": "1001",
+          "sources": ["COMMENT", "DANMAKU"],
+          "grounding": "FEEDBACK_ONLY"
+        }
+      }
+    },
+    {
+      "case_id": "product-empty-1001",
+      "case_version": "0.1.0",
+      "scenario_id": "product_capture_empty",
+      "prompt": "分析视频1001从2026-11-05到2026-11-12的评论和弹幕，生成观众反馈HTML报告，不读取视频内容",
+      "report_scope": "FEEDBACK_ONLY",
+      "source_group": "demo_fixture_group",
+      "material_class": "synthetic_fixture",
+      "material": {
+        "kind": "synthetic_inline",
+        "content": "ReportEvaluationBridgeHttpTest#script injects the feedback fixture through a mocked FeedbackSnapshotPort: video 1001, 20 COMMENT + 20 DANMAKU units, texts '1'..'20', first comment expression 背景音乐盖住了人声, first danmaku expression 声音太小听不清楚, userIds viewer1..viewer20, timestamp = window end minus 1 second, danmaku playback 1000ms, first unit likes 120 and the rest 1. The empty capture injects zero units. The product reads this injected fixture, not a file on disk.",
+        "content_sha256": "9680c7bb1d0d565fbb7c3fd983912b4291acade00147da07e2183ccdf0e69b3d",
+        "provenance": "injected_by_test_mock"
+      },
+      "task_clock": {"reference_time": "2026-11-12 10:00:00", "timezone": "Asia/Shanghai"},
+      "timezone": "Asia/Shanghai",
+      "task_window": {"kind": "absolute", "start": "2026-11-05", "end": "2026-11-12"},
+      "expected": {
+        "facts": [],
+        "evidence_anchors": [],
+        "timestamp_tolerance_ms": null,
+        "prohibited_claims": ["真实平台用户行为", "真实模型输出质量", "空结果等于失败"]
+      },
+      "review": {"reviewer_ref": null, "reviewed_at": null, "status": "pending"},
+      "roles": {
+        "controller": "demo-scripted",
+        "feedback_analysis": "demo-scripted",
+        "vision": "not_enabled",
+        "transcription": "not_enabled",
+        "protocol": "product_compressed"
+      },
+      "interaction_script": {"clarification_replies": []},
+      "tool_permissions": {"read_dataset": false, "network": false, "ssh": false},
+      "cache_replay_policy": {"cache": "disabled", "replay": "not_implemented"},
+      "scoring_rules_version": "draft-v0",
+      "product_capture": {
+        "bundle_id": "product-empty",
+        "evidence_level": "product_http_mockmvc",
+        "adapter_version": "product-adapter-v1",
+        "request": {
+          "prompt": "分析视频1001从2026-11-05到2026-11-12的评论和弹幕，生成观众反馈HTML报告，不读取视频内容",
+          "owner_token": "demo-alice",
+          "video_id": "1001",
+          "sources": ["COMMENT", "DANMAKU"],
+          "grounding": "FEEDBACK_ONLY"
+        }
+      }
+    },
+    {
+      "case_id": "product-needs-input-1001",
+      "case_version": "0.1.0",
+      "scenario_id": "product_capture_needs_input",
+      "prompt": "分析视频1001从2026-10-10到2026-10-20的评论和弹幕，生成观众反馈HTML报告，不读取视频内容",
+      "report_scope": "FEEDBACK_ONLY",
+      "source_group": "demo_fixture_group",
+      "material_class": "synthetic_fixture",
+      "material": {
+        "kind": "synthetic_inline",
+        "content": "ReportEvaluationBridgeHttpTest#script injects the feedback fixture through a mocked FeedbackSnapshotPort: video 1001, 20 COMMENT + 20 DANMAKU units, texts '1'..'20', first comment expression 背景音乐盖住了人声, first danmaku expression 声音太小听不清楚, userIds viewer1..viewer20, timestamp = window end minus 1 second, danmaku playback 1000ms, first unit likes 120 and the rest 1. The empty capture injects zero units. The product reads this injected fixture, not a file on disk.",
+        "content_sha256": "9680c7bb1d0d565fbb7c3fd983912b4291acade00147da07e2183ccdf0e69b3d",
+        "provenance": "injected_by_test_mock"
+      },
+      "task_clock": {"reference_time": "2026-10-20 10:00:00", "timezone": "Asia/Shanghai"},
+      "timezone": "Asia/Shanghai",
+      "task_window": {"kind": "absolute", "start": "2026-10-10", "end": "2026-10-20"},
+      "expected": {
+        "facts": [],
+        "evidence_anchors": [],
+        "timestamp_tolerance_ms": null,
+        "prohibited_claims": ["待澄清等于交付成功", "无报告时仍记200"]
+      },
+      "review": {"reviewer_ref": null, "reviewed_at": null, "status": "pending"},
+      "roles": {
+        "controller": "demo-scripted",
+        "feedback_analysis": "demo-scripted",
+        "vision": "not_enabled",
+        "transcription": "not_enabled",
+        "protocol": "product_compressed"
+      },
+      "interaction_script": {"clarification_replies": []},
+      "tool_permissions": {"read_dataset": false, "network": false, "ssh": false},
+      "cache_replay_policy": {"cache": "disabled", "replay": "not_implemented"},
+      "scoring_rules_version": "draft-v0",
+      "product_capture": {
+        "bundle_id": "product-needs-input",
+        "evidence_level": "product_http_mockmvc",
+        "adapter_version": "product-adapter-v1",
+        "request": {
+          "prompt": "分析视频1001从2026-10-10到2026-10-20的评论和弹幕，生成观众反馈HTML报告，不读取视频内容",
+          "owner_token": "demo-alice",
+          "video_id": "1001",
+          "sources": ["COMMENT", "DANMAKU"],
+          "grounding": "FEEDBACK_ONLY"
+        }
+      }
+    }
+  ]
+}

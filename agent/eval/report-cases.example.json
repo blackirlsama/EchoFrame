@@ -1,0 +1,647 @@
+{
+  "version": "0.1.0",
+  "status": "draft",
+  "kind": "report-eval-cases",
+  "description": "手工合成离线示例：仅验证执行/记录/检查流程，不含真实用户数据，不计正式语义成绩。兼容 manual-case.example.json 核心字段。",
+  "cases": [
+    {
+      "case_id": "synthetic-success-001",
+      "case_version": "0.1.0",
+      "scenario_id": "offline_success",
+      "assessment_scope": "synthetic_offline_fixture",
+      "report_scope": "FEEDBACK_ONLY",
+      "source_group": "synthetic_fixture_group",
+      "material_class": "synthetic_fixture",
+      "prompt": "根据合成评论快照统计最近7天（含昨天）的反馈数量并生成报告。",
+      "asset_ref": null,
+      "content_sha256": null,
+      "content_version": null,
+      "scope_ref": null,
+      "snapshot_ref": null,
+      "snapshot_at": null,
+      "material": {
+        "kind": "synthetic_inline",
+        "content": "合成评论快照（synthetic-success-001）：用户甲 2026-11-08 好评；用户乙 2026-11-09 差评。仅供离线工程验证。",
+        "content_sha256": "a83c4af7e7cc4f46eca1f98755da0c31521a0b55c773c1d996d852011fd1344f"
+      },
+      "timezone": "Asia/Shanghai",
+      "task_clock": {
+        "reference_time": "2026-11-10 10:00:00",
+        "timezone": "Asia/Shanghai"
+      },
+      "task_window": {
+        "kind": "relative",
+        "days": 7,
+        "anchor": "yesterday"
+      },
+      "interaction_script": {
+        "clarification_replies": [
+          "统计最近7天，含昨天。"
+        ]
+      },
+      "roles": {
+        "controller": "offline-simulated",
+        "feedback_analysis": "offline-simulated",
+        "vision": "not_enabled",
+        "transcription": "not_enabled",
+        "protocol": "offline"
+      },
+      "tool_permissions": {
+        "read_dataset": true,
+        "network": false,
+        "ssh": false
+      },
+      "cache_replay_policy": {
+        "cache": "disabled",
+        "replay": "not_implemented"
+      },
+      "scoring_rules_version": "draft-v0",
+      "expected": {
+        "facts": [],
+        "evidence_anchors": [],
+        "timestamp_tolerance_ms": null,
+        "prohibited_claims": [
+          "真实平台用户行为",
+          "真实模型质量结论"
+        ]
+      },
+      "review": {
+        "reviewer_ref": null,
+        "reviewed_at": null,
+        "status": "pending"
+      },
+      "offline_simulation": {
+        "scenario": "success"
+      },
+      "last_result": null
+    },
+    {
+      "case_id": "synthetic-failure-001",
+      "case_version": "0.1.0",
+      "scenario_id": "offline_failure",
+      "assessment_scope": "synthetic_offline_fixture",
+      "report_scope": "FEEDBACK_ONLY",
+      "source_group": "synthetic_fixture_group",
+      "material_class": "synthetic_fixture",
+      "prompt": "根据合成评论快照统计最近7天（含昨天）的反馈数量并生成报告。",
+      "asset_ref": null,
+      "content_sha256": null,
+      "content_version": null,
+      "scope_ref": null,
+      "snapshot_ref": null,
+      "snapshot_at": null,
+      "material": {
+        "kind": "synthetic_inline",
+        "content": "合成评论快照（synthetic-failure-001）：用户甲 2026-11-08 好评；用户乙 2026-11-09 差评。仅供离线工程验证。",
+        "content_sha256": "290aca42966356c96ffd556c12a967975c7098b804847527a2f69203683428f0"
+      },
+      "timezone": "Asia/Shanghai",
+      "task_clock": {
+        "reference_time": "2026-11-10 10:00:00",
+        "timezone": "Asia/Shanghai"
+      },
+      "task_window": {
+        "kind": "relative",
+        "days": 7,
+        "anchor": "yesterday"
+      },
+      "interaction_script": {
+        "clarification_replies": [
+          "统计最近7天，含昨天。"
+        ]
+      },
+      "roles": {
+        "controller": "offline-simulated",
+        "feedback_analysis": "offline-simulated",
+        "vision": "not_enabled",
+        "transcription": "not_enabled",
+        "protocol": "offline"
+      },
+      "tool_permissions": {
+        "read_dataset": true,
+        "network": false,
+        "ssh": false
+      },
+      "cache_replay_policy": {
+        "cache": "disabled",
+        "replay": "not_implemented"
+      },
+      "scoring_rules_version": "draft-v0",
+      "expected": {
+        "facts": [],
+        "evidence_anchors": [],
+        "timestamp_tolerance_ms": null,
+        "prohibited_claims": [
+          "真实平台用户行为",
+          "真实模型质量结论"
+        ]
+      },
+      "review": {
+        "reviewer_ref": null,
+        "reviewed_at": null,
+        "status": "pending"
+      },
+      "offline_simulation": {
+        "scenario": "failure"
+      },
+      "last_result": null
+    },
+    {
+      "case_id": "synthetic-clarify-001",
+      "case_version": "0.1.0",
+      "scenario_id": "offline_needs_clarification",
+      "assessment_scope": "synthetic_offline_fixture",
+      "report_scope": "FEEDBACK_ONLY",
+      "source_group": "synthetic_fixture_group",
+      "material_class": "synthetic_fixture",
+      "prompt": "根据合成评论快照统计最近7天（含昨天）的反馈数量并生成报告。",
+      "asset_ref": null,
+      "content_sha256": null,
+      "content_version": null,
+      "scope_ref": null,
+      "snapshot_ref": null,
+      "snapshot_at": null,
+      "material": {
+        "kind": "synthetic_inline",
+        "content": "合成评论快照（synthetic-clarify-001）：用户甲 2026-11-08 好评；用户乙 2026-11-09 差评。仅供离线工程验证。",
+        "content_sha256": "b30e9d885dac75d1958d43d12404a3f290f0ad2c0b62431027e72dc339915e72"
+      },
+      "timezone": "Asia/Shanghai",
+      "task_clock": {
+        "reference_time": "2026-11-10 10:00:00",
+        "timezone": "Asia/Shanghai"
+      },
+      "task_window": {
+        "kind": "relative",
+        "days": 7,
+        "anchor": "yesterday"
+      },
+      "interaction_script": {
+        "clarification_replies": [
+          "统计最近7天，含昨天。"
+        ]
+      },
+      "roles": {
+        "controller": "offline-simulated",
+        "feedback_analysis": "offline-simulated",
+        "vision": "not_enabled",
+        "transcription": "not_enabled",
+        "protocol": "offline"
+      },
+      "tool_permissions": {
+        "read_dataset": true,
+        "network": false,
+        "ssh": false
+      },
+      "cache_replay_policy": {
+        "cache": "disabled",
+        "replay": "not_implemented"
+      },
+      "scoring_rules_version": "draft-v0",
+      "expected": {
+        "facts": [],
+        "evidence_anchors": [],
+        "timestamp_tolerance_ms": null,
+        "prohibited_claims": [
+          "真实平台用户行为",
+          "真实模型质量结论"
+        ]
+      },
+      "review": {
+        "reviewer_ref": null,
+        "reviewed_at": null,
+        "status": "pending"
+      },
+      "offline_simulation": {
+        "scenario": "needs_clarification"
+      },
+      "last_result": null
+    },
+    {
+      "case_id": "synthetic-retry-001",
+      "case_version": "0.1.0",
+      "scenario_id": "offline_retry_success",
+      "assessment_scope": "synthetic_offline_fixture",
+      "report_scope": "FEEDBACK_ONLY",
+      "source_group": "synthetic_fixture_group",
+      "material_class": "synthetic_fixture",
+      "prompt": "根据合成评论快照统计最近7天（含昨天）的反馈数量并生成报告。",
+      "asset_ref": null,
+      "content_sha256": null,
+      "content_version": null,
+      "scope_ref": null,
+      "snapshot_ref": null,
+      "snapshot_at": null,
+      "material": {
+        "kind": "synthetic_inline",
+        "content": "合成评论快照（synthetic-retry-001）：用户甲 2026-11-08 好评；用户乙 2026-11-09 差评。仅供离线工程验证。",
+        "content_sha256": "72072c466ac7f3d66cc7a6466edb77f93f4a875799bfe780c3cddf9b5c811db2"
+      },
+      "timezone": "Asia/Shanghai",
+      "task_clock": {
+        "reference_time": "2026-11-10 10:00:00",
+        "timezone": "Asia/Shanghai"
+      },
+      "task_window": {
+        "kind": "relative",
+        "days": 7,
+        "anchor": "yesterday"
+      },
+      "interaction_script": {
+        "clarification_replies": [
+          "统计最近7天，含昨天。"
+        ]
+      },
+      "roles": {
+        "controller": "offline-simulated",
+        "feedback_analysis": "offline-simulated",
+        "vision": "not_enabled",
+        "transcription": "not_enabled",
+        "protocol": "offline"
+      },
+      "tool_permissions": {
+        "read_dataset": true,
+        "network": false,
+        "ssh": false
+      },
+      "cache_replay_policy": {
+        "cache": "disabled",
+        "replay": "not_implemented"
+      },
+      "scoring_rules_version": "draft-v0",
+      "expected": {
+        "facts": [],
+        "evidence_anchors": [],
+        "timestamp_tolerance_ms": null,
+        "prohibited_claims": [
+          "真实平台用户行为",
+          "真实模型质量结论"
+        ]
+      },
+      "review": {
+        "reviewer_ref": null,
+        "reviewed_at": null,
+        "status": "pending"
+      },
+      "offline_simulation": {
+        "scenario": "retry_success"
+      },
+      "last_result": null
+    },
+    {
+      "case_id": "synthetic-missing-report-001",
+      "case_version": "0.1.0",
+      "scenario_id": "offline_missing_report",
+      "assessment_scope": "synthetic_offline_fixture",
+      "report_scope": "FEEDBACK_ONLY",
+      "source_group": "synthetic_fixture_group",
+      "material_class": "synthetic_fixture",
+      "prompt": "根据合成评论快照统计最近7天（含昨天）的反馈数量并生成报告。",
+      "asset_ref": null,
+      "content_sha256": null,
+      "content_version": null,
+      "scope_ref": null,
+      "snapshot_ref": null,
+      "snapshot_at": null,
+      "material": {
+        "kind": "synthetic_inline",
+        "content": "合成评论快照（synthetic-missing-report-001）：用户甲 2026-11-08 好评；用户乙 2026-11-09 差评。仅供离线工程验证。",
+        "content_sha256": "e23307db2d9fad212b40ad981ccce111ea00b77cf9132d4ab584215023e8eb1e"
+      },
+      "timezone": "Asia/Shanghai",
+      "task_clock": {
+        "reference_time": "2026-11-10 10:00:00",
+        "timezone": "Asia/Shanghai"
+      },
+      "task_window": {
+        "kind": "relative",
+        "days": 7,
+        "anchor": "yesterday"
+      },
+      "interaction_script": {
+        "clarification_replies": [
+          "统计最近7天，含昨天。"
+        ]
+      },
+      "roles": {
+        "controller": "offline-simulated",
+        "feedback_analysis": "offline-simulated",
+        "vision": "not_enabled",
+        "transcription": "not_enabled",
+        "protocol": "offline"
+      },
+      "tool_permissions": {
+        "read_dataset": true,
+        "network": false,
+        "ssh": false
+      },
+      "cache_replay_policy": {
+        "cache": "disabled",
+        "replay": "not_implemented"
+      },
+      "scoring_rules_version": "draft-v0",
+      "expected": {
+        "facts": [],
+        "evidence_anchors": [],
+        "timestamp_tolerance_ms": null,
+        "prohibited_claims": [
+          "真实平台用户行为",
+          "真实模型质量结论"
+        ]
+      },
+      "review": {
+        "reviewer_ref": null,
+        "reviewed_at": null,
+        "status": "pending"
+      },
+      "offline_simulation": {
+        "scenario": "missing_report"
+      },
+      "last_result": null
+    },
+    {
+      "case_id": "synthetic-missing-trace-001",
+      "case_version": "0.1.0",
+      "scenario_id": "offline_missing_trace",
+      "assessment_scope": "synthetic_offline_fixture",
+      "report_scope": "FEEDBACK_ONLY",
+      "source_group": "synthetic_fixture_group",
+      "material_class": "synthetic_fixture",
+      "prompt": "根据合成评论快照统计最近7天（含昨天）的反馈数量并生成报告。",
+      "asset_ref": null,
+      "content_sha256": null,
+      "content_version": null,
+      "scope_ref": null,
+      "snapshot_ref": null,
+      "snapshot_at": null,
+      "material": {
+        "kind": "synthetic_inline",
+        "content": "合成评论快照（synthetic-missing-trace-001）：用户甲 2026-11-08 好评；用户乙 2026-11-09 差评。仅供离线工程验证。",
+        "content_sha256": "6ed665e4b9fa6bac2f95f0eecf15cee4bbaacfbec14069b955d501b3961dba63"
+      },
+      "timezone": "Asia/Shanghai",
+      "task_clock": {
+        "reference_time": "2026-11-10 10:00:00",
+        "timezone": "Asia/Shanghai"
+      },
+      "task_window": {
+        "kind": "relative",
+        "days": 7,
+        "anchor": "yesterday"
+      },
+      "interaction_script": {
+        "clarification_replies": [
+          "统计最近7天，含昨天。"
+        ]
+      },
+      "roles": {
+        "controller": "offline-simulated",
+        "feedback_analysis": "offline-simulated",
+        "vision": "not_enabled",
+        "transcription": "not_enabled",
+        "protocol": "offline"
+      },
+      "tool_permissions": {
+        "read_dataset": true,
+        "network": false,
+        "ssh": false
+      },
+      "cache_replay_policy": {
+        "cache": "disabled",
+        "replay": "not_implemented"
+      },
+      "scoring_rules_version": "draft-v0",
+      "expected": {
+        "facts": [],
+        "evidence_anchors": [],
+        "timestamp_tolerance_ms": null,
+        "prohibited_claims": [
+          "真实平台用户行为",
+          "真实模型质量结论"
+        ]
+      },
+      "review": {
+        "reviewer_ref": null,
+        "reviewed_at": null,
+        "status": "pending"
+      },
+      "offline_simulation": {
+        "scenario": "missing_trace"
+      },
+      "last_result": null
+    },
+    {
+      "case_id": "synthetic-interrupted-001",
+      "case_version": "0.1.0",
+      "scenario_id": "offline_interrupted",
+      "assessment_scope": "synthetic_offline_fixture",
+      "report_scope": "FEEDBACK_ONLY",
+      "source_group": "synthetic_fixture_group",
+      "material_class": "synthetic_fixture",
+      "prompt": "根据合成评论快照统计最近7天（含昨天）的反馈数量并生成报告。",
+      "asset_ref": null,
+      "content_sha256": null,
+      "content_version": null,
+      "scope_ref": null,
+      "snapshot_ref": null,
+      "snapshot_at": null,
+      "material": {
+        "kind": "synthetic_inline",
+        "content": "合成评论快照（synthetic-interrupted-001）：用户甲 2026-11-08 好评；用户乙 2026-11-09 差评。仅供离线工程验证。",
+        "content_sha256": "ab5be975c764ae6da4aee70bca67aa9d44498f7c012cc8c807418154c4b3fa13"
+      },
+      "timezone": "Asia/Shanghai",
+      "task_clock": {
+        "reference_time": "2026-11-10 10:00:00",
+        "timezone": "Asia/Shanghai"
+      },
+      "task_window": {
+        "kind": "relative",
+        "days": 7,
+        "anchor": "yesterday"
+      },
+      "interaction_script": {
+        "clarification_replies": [
+          "统计最近7天，含昨天。"
+        ]
+      },
+      "roles": {
+        "controller": "offline-simulated",
+        "feedback_analysis": "offline-simulated",
+        "vision": "not_enabled",
+        "transcription": "not_enabled",
+        "protocol": "offline"
+      },
+      "tool_permissions": {
+        "read_dataset": true,
+        "network": false,
+        "ssh": false
+      },
+      "cache_replay_policy": {
+        "cache": "disabled",
+        "replay": "not_implemented"
+      },
+      "scoring_rules_version": "draft-v0",
+      "expected": {
+        "facts": [],
+        "evidence_anchors": [],
+        "timestamp_tolerance_ms": null,
+        "prohibited_claims": [
+          "真实平台用户行为",
+          "真实模型质量结论"
+        ]
+      },
+      "review": {
+        "reviewer_ref": null,
+        "reviewed_at": null,
+        "status": "pending"
+      },
+      "offline_simulation": {
+        "scenario": "interrupted"
+      },
+      "last_result": null
+    },
+    {
+      "case_id": "synthetic-out-of-bounds-001",
+      "case_version": "0.1.0",
+      "scenario_id": "offline_out_of_bounds",
+      "assessment_scope": "synthetic_offline_fixture",
+      "report_scope": "FEEDBACK_ONLY",
+      "source_group": "synthetic_fixture_group",
+      "material_class": "synthetic_fixture",
+      "prompt": "根据合成评论快照统计最近7天（含昨天）的反馈数量并生成报告。",
+      "asset_ref": null,
+      "content_sha256": null,
+      "content_version": null,
+      "scope_ref": null,
+      "snapshot_ref": null,
+      "snapshot_at": null,
+      "material": {
+        "kind": "synthetic_inline",
+        "content": "合成评论快照（synthetic-out-of-bounds-001）：用户甲 2026-11-08 好评；用户乙 2026-11-09 差评。仅供离线工程验证。",
+        "content_sha256": "8e74d8cd5f38f74e6e2f217be4b0593597d181446c79bddaf79967b980d682e1"
+      },
+      "timezone": "Asia/Shanghai",
+      "task_clock": {
+        "reference_time": "2026-11-10 10:00:00",
+        "timezone": "Asia/Shanghai"
+      },
+      "task_window": {
+        "kind": "relative",
+        "days": 7,
+        "anchor": "yesterday"
+      },
+      "interaction_script": {
+        "clarification_replies": [
+          "统计最近7天，含昨天。"
+        ]
+      },
+      "roles": {
+        "controller": "offline-simulated",
+        "feedback_analysis": "offline-simulated",
+        "vision": "not_enabled",
+        "transcription": "not_enabled",
+        "protocol": "offline"
+      },
+      "tool_permissions": {
+        "read_dataset": true,
+        "network": false,
+        "ssh": false
+      },
+      "cache_replay_policy": {
+        "cache": "disabled",
+        "replay": "not_implemented"
+      },
+      "scoring_rules_version": "draft-v0",
+      "expected": {
+        "facts": [],
+        "evidence_anchors": [],
+        "timestamp_tolerance_ms": null,
+        "prohibited_claims": [
+          "真实平台用户行为",
+          "真实模型质量结论"
+        ]
+      },
+      "review": {
+        "reviewer_ref": null,
+        "reviewed_at": null,
+        "status": "pending"
+      },
+      "offline_simulation": {
+        "scenario": "out_of_bounds"
+      },
+      "last_result": null
+    },
+    {
+      "case_id": "synthetic-video-only-001",
+      "case_version": "0.1.0",
+      "scenario_id": "offline_success",
+      "assessment_scope": "synthetic_offline_fixture",
+      "report_scope": "VIDEO_ONLY",
+      "source_group": "synthetic_fixture_group",
+      "material_class": "synthetic_fixture",
+      "prompt": "对合成视频引用做基础交付检查（离线模拟）。",
+      "asset_ref": null,
+      "content_sha256": null,
+      "content_version": null,
+      "scope_ref": null,
+      "snapshot_ref": null,
+      "snapshot_at": null,
+      "material": {
+        "kind": "synthetic_inline",
+        "content": "合成评论快照（synthetic-video-only-001）：用户甲 2026-11-08 好评；用户乙 2026-11-09 差评。仅供离线工程验证。",
+        "content_sha256": "a9abe6d63bdf8e180ddde36078b55d9cd1b5c7df5bfcf856022da3fc5a6516b7"
+      },
+      "timezone": "Asia/Shanghai",
+      "task_clock": {
+        "reference_time": "2026-11-10 10:00:00",
+        "timezone": "Asia/Shanghai"
+      },
+      "task_window": {
+        "kind": "relative",
+        "days": 7,
+        "anchor": "yesterday"
+      },
+      "interaction_script": {
+        "clarification_replies": [
+          "统计最近7天，含昨天。"
+        ]
+      },
+      "roles": {
+        "controller": "offline-simulated",
+        "feedback_analysis": "offline-simulated",
+        "vision": "not_enabled",
+        "transcription": "not_enabled",
+        "protocol": "offline"
+      },
+      "tool_permissions": {
+        "read_dataset": true,
+        "network": false,
+        "ssh": false
+      },
+      "cache_replay_policy": {
+        "cache": "disabled",
+        "replay": "not_implemented"
+      },
+      "scoring_rules_version": "draft-v0",
+      "expected": {
+        "facts": [],
+        "evidence_anchors": [],
+        "timestamp_tolerance_ms": null,
+        "prohibited_claims": [
+          "真实平台用户行为",
+          "真实模型质量结论"
+        ]
+      },
+      "review": {
+        "reviewer_ref": null,
+        "reviewed_at": null,
+        "status": "pending"
+      },
+      "offline_simulation": {
+        "scenario": "success"
+      },
+      "last_result": null
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "kind": "report-trial-admission",
+  "schema_version": 1,
+  "draft": true,
+  "credentials_embedded": false,
+  "note": "Synthetic offline evaluation fixture. No real media, accounts or credentials.",
+  "budget": {
+    "total_cny": 1000,
+    "pause_cny": 100,
+    "covers": "offline only"
+  },
+  "task_clock": {
+    "timezone": "Asia/Shanghai",
+    "reference_time": "2026-11-10 00:00:00"
+  },
+  "tool_freeze": {
+    "key_spec_version": "freeze-key-v2",
+    "tool_config_version": "synthetic-v1",
+    "sampling_strategy": "frame-12-window-full"
+  },
+  "roles": [],
+  "materials": [
+    {
+      "key": "hxc-doufu",
+      "label": "合成豆腐",
+      "dataset_root": "eval/fixtures/synthetic",
+      "video_path": "eval/fixtures/synthetic/video.mp4",
+      "binding": {
+        "video_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "comment_sha256": "1b7fb300029a63ea1432c985cd27582bfc88d2e7b312a5ba21725066b7b59703",
+        "danmaku_sha256": "f8c300811867327b2f6d4bfc495136fabf794c3f03bdb3faf333521d161f6323",
+        "dataset_version": "synthetic-v1"
+      },
+      "service_probe": {
+        "host": "127.0.0.1",
+        "port": 18701
+      }
+    },
+    {
+      "key": "my-dragon",
+      "label": "合成龙",
+      "dataset_root": "eval/fixtures/synthetic",
+      "video_path": "eval/fixtures/synthetic/video.mp4",
+      "binding": {
+        "video_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "comment_sha256": "1b7fb300029a63ea1432c985cd27582bfc88d2e7b312a5ba21725066b7b59703",
+        "danmaku_sha256": "f8c300811867327b2f6d4bfc495136fabf794c3f03bdb3faf333521d161f6323",
+        "dataset_version": "synthetic-v1"
+      },
+      "service_probe": {
+        "host": "127.0.0.1",
+        "port": 18701
+      }
+    },
+    {
+      "key": "ysjf-canon",
+      "label": "合成佳能",
+      "dataset_root": "eval/fixtures/synthetic",
+      "video_path": "eval/fixtures/synthetic/video.mp4",
+      "binding": {
+        "video_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "comment_sha256": "1b7fb300029a63ea1432c985cd27582bfc88d2e7b312a5ba21725066b7b59703",
+        "danmaku_sha256": "f8c300811867327b2f6d4bfc495136fabf794c3f03bdb3faf333521d161f6323",
+        "dataset_version": "synthetic-v1"
+      },
+      "service_probe": {
+        "host": "127.0.0.1",
+        "port": 18701
+      }
+    }
+  ]
+}

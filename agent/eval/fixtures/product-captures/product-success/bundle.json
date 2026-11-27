@@ -1,0 +1,116 @@
+{
+  "schema_version" : 1,
+  "bundle_id" : "product-success",
+  "adapter_contract" : "product-bundle-v1",
+  "evidence_level" : "product_http_mockmvc",
+  "material_class" : "synthetic_fixture",
+  "producer" : {
+    "kind" : "product_http_mockmvc",
+    "test_class" : "com.tianmu.agent.feedback.ReportEvaluationBridgeHttpTest",
+    "test_method" : "product-success",
+    "maven_command" : "mvn -o -f agent/pom.xml -Dspring.profiles.active=demo -Dtest=ReportEvaluationBridgeHttpTest test",
+    "captured_at" : "2026-11-25T02:05:50.812265Z",
+    "spring_profile" : "demo",
+    "java_version" : "21.0.12.1"
+  },
+  "request" : {
+    "prompt" : "分析视频1001从2026-11-05到2026-11-12的评论和弹幕，生成观众反馈HTML报告，不读取视频内容",
+    "owner_token" : "demo-alice",
+    "video_id" : "1001",
+    "sources" : [ "COMMENT", "DANMAKU" ],
+    "grounding" : "FEEDBACK_ONLY"
+  },
+  "notes" : [ "MockMvc contract capture; no HTTP server started, no real model, no formal material.", "ModelPort is a Mockito mock, so no dispatched model.request spans exist; token usage stays unknown.", "The product limits explicit ranges to the previous 30 days; the submit-time business clock is pinned to 2026-11-21 so reruns keep the same window." ],
+  "responses" : {
+    "json" : {
+      "path" : "responses/report.json",
+      "http_status" : 200,
+      "content_type" : "application/json",
+      "sha256" : "463671636edf86c239fd2311a967d0de729785493211c27386edc4fcc25a751f",
+      "bytes" : 2974
+    },
+    "html" : {
+      "path" : "responses/report.html",
+      "http_status" : 200,
+      "content_type" : "text/html;charset=UTF-8",
+      "sha256" : "7443e9df0f4d0fad41d3db79669ef37fea0846d09ab8d13851962e9079406a6e",
+      "bytes" : 16789
+    }
+  },
+  "access_checks" : [ {
+    "name" : "unauthenticated",
+    "http_status" : 401,
+    "authorization" : null
+  }, {
+    "name" : "cross_account",
+    "http_status" : 404,
+    "authorization" : "Bearer demo-bob"
+  }, {
+    "name" : "unknown_artifact",
+    "http_status" : 404,
+    "authorization" : "Bearer demo-alice"
+  }, {
+    "name" : "revoked_authorization",
+    "http_status" : 403,
+    "authorization" : "Bearer demo-alice"
+  } ],
+  "run" : {
+    "run_id" : "86a0f6b4-d536-4f6c-8566-d5b3891523b3",
+    "final_status" : "SUCCEEDED",
+    "clarification" : null,
+    "error_code" : null,
+    "artifact_id" : "rp_5a54e9d5-8f69-4527-8e6d-a871d2198089",
+    "evidence_id" : "ev_9f8bac86-5a9d-4c2d-8f04-09c528179779",
+    "receipt_tool" : "generate_feedback_report",
+    "receipt" : {
+      "artifact_id" : "rp_5a54e9d5-8f69-4527-8e6d-a871d2198089",
+      "json_url" : "/api/agent/runs/86a0f6b4-d536-4f6c-8566-d5b3891523b3/reports/rp_5a54e9d5-8f69-4527-8e6d-a871d2198089/json",
+      "topics" : [ "演示反馈" ],
+      "summary" : "主要反馈涉及：演示反馈。",
+      "url" : "/api/agent/runs/86a0f6b4-d536-4f6c-8566-d5b3891523b3/reports/rp_5a54e9d5-8f69-4527-8e6d-a871d2198089",
+      "evidence_id" : "ev_9f8bac86-5a9d-4c2d-8f04-09c528179779",
+      "demo" : true,
+      "method" : {
+        "exact" : 4,
+        "policy" : "84a30119250a20405f9d253ecc6fbd62f90e047674bceabdb0dfb90899d1a009",
+        "topics" : 1,
+        "bucket_metric" : {
+          "transform_version" : "raw-cosine-v1",
+          "fallback" : "TOO_FEW_EXPRESSIONS",
+          "mode" : "RAW_COSINE",
+          "expressions" : 4,
+          "threshold" : 0.65
+        },
+        "interpretation" : "主题依据聚类代表归纳，桶内数量为近似向量分配，未逐条阅读全部原文或经模型确认；未归类可能因相似度、支持度或候选限制。",
+        "raw_danmaku" : 20,
+        "representatives" : 4,
+        "route" : "VECTOR_RERANK",
+        "statistics_available" : true,
+        "clusters" : 1,
+        "method" : "feedback-five-buckets-v2",
+        "raw_unique_audience" : 20,
+        "raw_audience" : 40,
+        "eligible" : 40,
+        "unclassified" : 0,
+        "raw" : 40,
+        "quality_excluded_records" : 0,
+        "likes_available" : 4,
+        "model_bytes" : 1029,
+        "excluded" : 0,
+        "raw_comments" : 20
+      },
+      "status" : "READY"
+    },
+    "json_url" : "/api/agent/runs/86a0f6b4-d536-4f6c-8566-d5b3891523b3/reports/rp_5a54e9d5-8f69-4527-8e6d-a871d2198089/json",
+    "html_url" : "/api/agent/runs/86a0f6b4-d536-4f6c-8566-d5b3891523b3/reports/rp_5a54e9d5-8f69-4527-8e6d-a871d2198089"
+  },
+  "trace" : {
+    "path" : "traces/spans.jsonl",
+    "sha256" : "b684134ee48fa4c2717d9a088e110db408697e2295053bee3e08ab19cb0bc356",
+    "bytes" : 84243,
+    "span_count" : 50,
+    "run_id" : "86a0f6b4-d536-4f6c-8566-d5b3891523b3",
+    "source" : "harness_jsonl_archive",
+    "root_span_observed" : true
+  }
+}

@@ -166,4 +166,81 @@ class NativeToolBatchTest {
             assertEquals(io.opentelemetry.api.trace.StatusCode.ERROR,failed.getStatus().getStatusCode());
         }finally{workers.shutdown();}
     }
+    /** Records only what the diagnostic hook is allowed to carry: fixed enums, names, counts. */
+    static final class RecordingAdmission implements com.tianmu.agent.evaluation.admission.EvaluationFeeGate.Admission {
+        final List<com.tianmu.agent.evaluation.admission.EvaluationFeeGate.ToolRejection> rejections=new ArrayList<>();
+        final List<String> corrections=new ArrayList<>();
+        final List<String> stops=new ArrayList<>();
+        public void toolRejected(com.tianmu.agent.evaluation.admission.EvaluationFeeGate.ToolRejection rejection){rejections.add(rejection);}
+        public void toolCorrected(String runId,String tool,String phase,int correction){corrections.add(tool+"|"+phase+"|"+correction);}
+        public void toolStopped(String runId,String tool,String phase,String code,int corrections){stops.add(tool+"|"+phase+"|"+code+"|"+corrections);}
+        public com.tianmu.agent.evaluation.admission.EvaluationFeeGate.Reservation admitChat(String model,String host,long bytes,int max){return null;}
+        public com.tianmu.agent.evaluation.admission.EvaluationFeeGate.Reservation admitVideo(String provider,String path){return null;}
+    }
+    @Test void memberSchemaRefusalNamesTheSecondMemberFromTheDecisionPoint(){
+        var recorder=new RecordingAdmission();
+        try(var f=new HarnessLifecycleTest.Fixture()){
+            var run=f.run();run.execution().activateSkill("video-metrics");var turns=new AtomicInteger();
+            com.tianmu.agent.evaluation.admission.EvaluationFeeGate.install(recorder);
+            try{
+                f.execute(run,context->{
+                    if(turns.getAndIncrement()==0){var good=call(1);
+                        var bad=new ToolCall("query_video_metrics",Map.of("video_id",1001,"date","not-a-date","metric","bullet_count"),"bad","batch-1");
+                        return new Decision(Kind.TOOL,good,null,null,List.of(bad));}
+                    return Decision.clarify("请补充日期");
+                });
+            }finally{com.tianmu.agent.evaluation.admission.EvaluationFeeGate.clear();}
+            assertEquals(1,recorder.rejections.size());
+            var row=recorder.rejections.get(0);
+            assertEquals("query_video_metrics",row.tool(),"the second member, not the first");
+            assertEquals("BATCH",row.phase());
+            assertEquals("INVALID_ARGUMENTS",row.code());
+            assertEquals("BATCH_MEMBER_SCHEMA",row.failureClass());
+            assertEquals(List.of("date"),row.paths());
+            assertEquals(List.of("DATE"),row.problems());
+            assertEquals(1,row.issueCount());
+            assertFalse(row.issuesTruncated());
+            assertFalse(row.handlerExecuted());
+            assertEquals(List.of("query_video_metrics|BATCH|1"),recorder.corrections);
+            assertTrue(recorder.stops.isEmpty());
+            assertEquals(0,f.queries.get());
+        }
+    }
+    @Test void groupRefusalIsRecordedAsTheWholeBatchNotTheFirstTool(){
+        var recorder=new RecordingAdmission();
+        try(var f=new HarnessLifecycleTest.Fixture()){
+            var run=f.run();run.execution().activateSkill("audience-report");var turns=new AtomicInteger();
+            com.tianmu.agent.evaluation.admission.EvaluationFeeGate.install(recorder);
+            try{
+                f.execute(run,context->turns.getAndIncrement()==0?mixed(1):Decision.clarify("请补充重点"));
+            }finally{com.tianmu.agent.evaluation.admission.EvaluationFeeGate.clear();}
+            assertEquals(1,recorder.rejections.size());
+            var row=recorder.rejections.get(0);
+            assertEquals(com.tianmu.agent.tool.ToolDispatcher.BATCH_GROUP_TOOL,row.tool());
+            assertEquals("*batch*",row.tool());
+            assertEquals("BATCH_GROUP",row.phase());
+            assertEquals("INVALID_TOOL_BATCH",row.code());
+            assertEquals("BATCH_GROUP",row.failureClass());
+            assertTrue(row.paths().isEmpty());
+            assertTrue(row.problems().isEmpty());
+            assertEquals(0,row.issueCount());
+            assertFalse(row.handlerExecuted());
+            assertEquals(List.of("*batch*|BATCH_GROUP|1"),recorder.corrections);
+            assertTrue(recorder.stops.isEmpty());
+        }
+    }
+    @Test void exhaustedBatchCorrectionsStopWithTheSameContextTheyWereRefusedWith(){
+        var recorder=new RecordingAdmission();
+        try(var f=new HarnessLifecycleTest.Fixture()){
+            var run=f.run();run.execution().activateSkill("audience-report");var turns=new AtomicInteger();
+            com.tianmu.agent.evaluation.admission.EvaluationFeeGate.install(recorder);
+            try{
+                f.execute(run,context->mixed(turns.incrementAndGet()));
+            }finally{com.tianmu.agent.evaluation.admission.EvaluationFeeGate.clear();}
+            assertEquals("TOOL_FAILURE_LIMIT",run.snapshot().errorCode());
+            assertEquals(3,recorder.rejections.size());
+            assertEquals(List.of("*batch*|BATCH_GROUP|1","*batch*|BATCH_GROUP|2"),recorder.corrections);
+            assertEquals(List.of("*batch*|BATCH_GROUP|TOOL_FAILURE_LIMIT|2"),recorder.stops);
+        }
+    }
 }

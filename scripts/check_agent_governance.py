@@ -61,11 +61,14 @@ def catalog():
               "| `agent.feedback.buckets.centered-similarity` | 0.30 | 任务内中心化余弦门槛；别名 FEEDBACK_BUCKETS_CENTERED_SIMILARITY，与原始余弦门槛不能互换。 |", ""]
     lines += ["五桶模型候选数量使用 `agent.feedback.buckets.model-candidates-per-bucket`（默认8，上限8，别名 `FEEDBACK_BUCKETS_MODEL_CANDIDATES_PER_BUCKET`）；报告每桶最多展示3条。旧代表协议仍使用 compression 的每簇参数。", ""]
     lines += ["## agent.models", "", "| 属性键 | 默认值 | 消费及生效语义 |", "|---|---|---|",
+              "| `agent.models.protocol` | auto | DeepSeekProperties → DeepSeekClient；枚举 auto/deepseek/siliconflow/none（其他值拒绝启动）。auto 只按官方域名分类（api.deepseek.com→deepseek、api.siliconflow.cn→siliconflow），其余域名一律 none、不发任何一家的思考字段；本机回环替身或镜像域名做排练时必须显式声明，排练报文才与其声明要演练的线上格式一致。启动绑定，进入 analysisProtocolRevision，变更需排空在途Run；把一家协议的字段发给另一家在真实调用上是400，不按域名猜测。 |",
               "| `agent.models.thinking-enabled` | true | DeepSeekProperties → DeepSeekClient；YAML环境别名 `AGENT_MODEL_THINKING_ENABLED`。启动绑定，主循环原生工具及后台反馈分析启用；短输出前置识别、记忆模型仍关闭。仅DeepSeek端点或deepseek模型名发送thinking协议。模式和协议版本进入模型revision，变更需排空在途Run；不是执行策略快照字段。旧Trace不补造思考。 |", ""]
     lines += ["## agent.models思考预算", "", "| 属性键 | 默认值 | 消费及生效语义 |", "|---|---|---|",
               "| `agent.models.thinking-effort` | high | DeepSeekClient主循环思考强度，low/high/max；显式别名 `AGENT_MODEL_THINKING_EFFORT`，启动生效，进入native-thinking-v2模型revision。 |",
               "| `agent.models.analysis-thinking-effort` | low | 后台分析思考强度，low/high/max；显式别名 `AGENT_ANALYSIS_THINKING_EFFORT`。思考保持开启，强度和模式进入两种反馈policyHash，变化前排空job。 |",
               "| `agent.models.analysis-max-tokens` | 16384 | 后台分析单次总输出预算，含思考及最终JSON；8192–32768 Token。显式别名 `AGENT_ANALYSIS_MAX_OUTPUT_TOKENS`。消费DeepSeekFeedbackModels及DeepSeekAudienceModel，预算随实际值预留；job总预算不变，变化进入反馈policyHash。 |", ""]
+    lines += ["## agent.video视觉传输", "", "| 属性键 | 默认值 | 消费及生效语义 |", "|---|---|---|",
+              "| `agent.video.vision-transport` | auto | VideoModelProperties → VideoModelClient；枚举 auto/vlm_dedicated/openai_chat_vision/generic_chat_vision（其他值拒绝启动）。auto 保持历史映射（minimax→专用 /v1/coding_plan/vlm、compatible→通用聊天视觉），既有配置行为逐字节不变；显式值必须与 provider 身份一致（minimax 配 vlm_dedicated 或 openai_chat_vision，compatible 配 generic_chat_vision），不一致拒绝启动。openai_chat_vision 是本切片唯一可计费图片出口（MiniMax-M3、detail=low、thinking=disabled，费账按其上限预留）；专用 /v1/coding_plan/vlm 与音频转写无已核计费单元，保持拒绝。启动绑定。 |", ""]
     lines += ["## agent.feedback思考调用时限", "", "| 属性键 | 默认值 | 消费及生效语义 |", "|---|---|---|",
               "| `agent.feedback.model-timeout` | 基础30s；deepseek profile 120s | FeedbackPolicy → FeedbackAnalysisService；显式环境别名 `FEEDBACK_MODEL_TIMEOUT`，启动生效，精确范围1–180秒。单次模型调用取此值与job剩余deadline较小者；工作租约为超时加model-lease-margin-seconds，取消、fence、调用与Token预算不变。修改前排空既有任务，不将新策略冒充旧job版本。 |", ""]
     lines += ["## agent.feedback.embedding", "", "| 属性键 | 默认值 | 消费及生效语义 |", "|---|---|---|",

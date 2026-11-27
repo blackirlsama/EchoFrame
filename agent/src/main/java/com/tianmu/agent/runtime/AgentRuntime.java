@@ -21,6 +21,7 @@ import com.tianmu.agent.harness.trace.*;
 @Component
 public class AgentRuntime {
     @org.springframework.beans.factory.annotation.Autowired(required=false) private java.util.List<com.tianmu.agent.runtime.spi.ContextAuthority> contextAuthorities=java.util.List.of();
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private com.tianmu.agent.runtime.spi.ToolArgumentObserver argumentObserver;
     @org.springframework.beans.factory.annotation.Autowired(required=false) private ToolBatchExecutor toolBatches;
     @org.springframework.beans.factory.annotation.Autowired(required=false) private ToolBatchLedger batchLedger;
     private static final Logger log = LoggerFactory.getLogger(AgentRuntime.class);
@@ -192,8 +193,28 @@ public class AgentRuntime {
                 if(requested.stream().anyMatch(c->context.availableTools().stream().noneMatch(t->t.name().equals(c.name()))))
                     throw new AgentException("TOOL_NOT_AVAILABLE","Tool is outside the exposed set");
                 run.checkpoint();
-                if(progress.argumentCorrections>=2)throw new AgentException("TOOL_FAILURE_LIMIT","Tool correction limit reached");
+                // A member refusal already carries the member and the validation that decided it;
+                // a whole-group refusal has no member and is never attributed to the first tool.
+                com.tianmu.agent.tool.ToolArguments.Validation issues=null;
+                String tool,phase,failureClass;
+                if(rejected instanceof ToolDispatcher.BatchInputRejected member){
+                    tool=member.tool();phase="BATCH";failureClass="BATCH_MEMBER_SCHEMA";issues=member.validation();
+                }else{
+                    tool=ToolDispatcher.BATCH_GROUP_TOOL;phase="BATCH_GROUP";failureClass="BATCH_GROUP";
+                }
+                toolRejected(new com.tianmu.agent.runtime.spi.ToolArgumentObserver.Rejection(
+                        run.id.toString(), run.execution().exchanges().size(), tool, phase,
+                        rejected.code(),
+                        issues==null?java.util.List.of():com.tianmu.agent.tool.ToolArguments.diagnosticPaths(issues),
+                        issues==null?java.util.List.of():issues.issues().stream().map(issue->issue.code().name()).toList(),
+                        issues==null?0:issues.issues().size(), issues!=null && issues.truncated(),
+                        failureClass, false));
+                if(progress.argumentCorrections>=2) {
+                    toolStopped(run.id.toString(),tool,phase,"TOOL_FAILURE_LIMIT",progress.argumentCorrections);
+                    throw new AgentException("TOOL_FAILURE_LIMIT","Tool correction limit reached");
+                }
                 int correction=++progress.argumentCorrections;
+                toolCorrected(run.id.toString(),tool,phase,correction);
                 var feedbacks=new ArrayList<ToolResult>();
                 for(var call:requested) {
                     var feedback=new ToolResult(call.name(),Map.of("error_code",rejected.code(),"retryable",true,
@@ -285,9 +306,12 @@ public class AgentRuntime {
                 if(dispatched instanceof ToolDispatcher.ValidationRejected rejected) {
                     run.checkpoint();
                     int failure=progress.failure(name);
-                    if(progress.argumentCorrections>=2 || failure>=harness.policy(run).consecutiveToolFailures())
+                    if(progress.argumentCorrections>=2 || failure>=harness.policy(run).consecutiveToolFailures()) {
+                        toolStopped(run.id.toString(),name,"","TOOL_FAILURE_LIMIT",progress.argumentCorrections);
                         throw new AgentException("TOOL_FAILURE_LIMIT","Tool argument correction limit reached");
+                    }
                     progress.argumentCorrections++;inputRejected.set(true);
+                    toolCorrected(run.id.toString(),name,"",progress.argumentCorrections);
                     TraceAttributes.apply(io.opentelemetry.api.trace.Span.current(),Map.of("tool.validation_issue_count",rejected.validation().issues().size(),
                             "tool.argument_correction",progress.argumentCorrections));
                     raw=new ToolResult(name,Map.of("error_code","INVALID_ARGUMENTS","retryable",true,"attempt",failure,
@@ -301,7 +325,11 @@ public class AgentRuntime {
             });
         } catch (AgentException e) {
             run.checkpoint();
-            if (!RETRYABLE.contains(e.code())) throw e;
+            if (!RETRYABLE.contains(e.code())) {
+                if ("INVALID_ARGUMENTS".equals(e.code()))
+                    toolStopped(run.id.toString(),name,"",e.code(),progress.argumentCorrections);
+                throw e;
+            }
             int attempt = progress.failure(name);
             if (attempt >= harness.policy(run).consecutiveToolFailures())
                 throw new AgentException("TOOL_FAILURE_LIMIT", "Consecutive tool failures reached the limit");
@@ -354,5 +382,24 @@ public class AgentRuntime {
             if(!complete(run,decision.kind()==Kind.CLARIFY?null:decision.answer(),decision.kind()==Kind.CLARIFY?decision.clarification():null,StopReason.FINALIZED_ANSWER,reservation))throw new AgentException("INVALID_ANSWER","Finalization did not produce a terminal decision");
             return true;
         });
+    }
+    /** Observation is optional and must never replace the tool error being reported. */
+    private void toolRejected(com.tianmu.agent.runtime.spi.ToolArgumentObserver.Rejection rejection) {
+        var observer = argumentObserver != null ? argumentObserver
+                : com.tianmu.agent.runtime.spi.ToolArgumentObserver.installed();
+        if (observer == null) return;
+        try { observer.rejected(rejection); } catch (RuntimeException ignored) { }
+    }
+    private void toolCorrected(String runId, String tool, String phase, int correction) {
+        var observer = argumentObserver != null ? argumentObserver
+                : com.tianmu.agent.runtime.spi.ToolArgumentObserver.installed();
+        if (observer == null) return;
+        try { observer.corrected(runId, tool, phase, correction); } catch (RuntimeException ignored) { }
+    }
+    private void toolStopped(String runId, String tool, String phase, String code, int corrections) {
+        var observer = argumentObserver != null ? argumentObserver
+                : com.tianmu.agent.runtime.spi.ToolArgumentObserver.installed();
+        if (observer == null) return;
+        try { observer.stopped(runId, tool, phase, code, corrections); } catch (RuntimeException ignored) { }
     }
 }

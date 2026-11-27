@@ -1,0 +1,182 @@
+{
+  "kind": "report-trial-admission",
+  "schema_version": 1,
+  "draft": true,
+  "credentials_embedded": false,
+  "note": "Opt-in Canon admission example for the two-process offline evaluation. Material paths are placeholders; replace them with your local frozen material root and video path. The binding digests identify the frozen Canon material. base_url points at a local loopback stand-in, no credentials are embedded, and the visual role uses the generic openai_chat_vision transport.",
+  "budget": {
+    "total_cny": 50,
+    "pause_cny": 20,
+    "covers": "both providers, all roles, preparation, failures and retries"
+  },
+  "task_clock": {
+    "timezone": "Asia/Shanghai",
+    "reference_time": "2026-11-10 00:00:00"
+  },
+  "tool_freeze": {
+    "key_spec_version": "freeze-key-v2",
+    "tool_config_version": "admission-4b1",
+    "sampling_strategy": "frame-12-window-full"
+  },
+  "roles": [
+    {
+      "role": "preparation",
+      "provider": "siliconflow",
+      "transport": "chat_completions",
+      "endpoint": "/chat/completions",
+      "base_url": "http://127.0.0.1:18700",
+      "model_request_name": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "version_state": "REQUESTED_ONLY",
+      "max_output_tokens": 384,
+      "pricing": {
+        "currency": "CNY",
+        "input_per_million": 2.0,
+        "output_per_million": 8.0,
+        "source": "https://www.siliconflow.cn/pricing read 2026-11-18 (highest applicable tier, no discount)"
+      }
+    },
+    {
+      "role": "harness",
+      "provider": "siliconflow",
+      "transport": "chat_completions",
+      "endpoint": "/chat/completions",
+      "base_url": "http://127.0.0.1:18700",
+      "model_request_name": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "version_state": "REQUESTED_ONLY",
+      "max_output_tokens": 3072,
+      "note": "两款主控（对比用）共用本角色配置：deepseek-ai/DeepSeek-V4.1-Flash 与 deepseek-ai/DeepSeek-V4-Pro；请求名为公开别名，服务端实际版本须由真实响应回读。本角色 pricing 块为 controller-a 公开价（2.0/8.0 元每百万）；controller-b 公开价为 12.0/24.0 元每百万（同一来源、同一读取日 2026-11-18）。逐主控价表以 provider-contracts-4b2a-v1（scripts/report_evaluation/admission/contracts.py）为同源权威，计划器按各自主控价分别计算，不以本块覆盖 controller-b。",
+      "pricing": {
+        "currency": "CNY",
+        "input_per_million": 2.0,
+        "output_per_million": 8.0,
+        "source": "https://www.siliconflow.cn/pricing read 2026-11-18 (highest applicable tier, no discount)"
+      }
+    },
+    {
+      "role": "analysis",
+      "provider": "siliconflow",
+      "transport": "chat_completions",
+      "endpoint": "/chat/completions",
+      "base_url": "http://127.0.0.1:18700",
+      "model_request_name": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "version_state": "REQUESTED_ONLY",
+      "max_output_tokens": 16384,
+      "pricing": {
+        "currency": "CNY",
+        "input_per_million": 2.0,
+        "output_per_million": 8.0,
+        "source": "https://www.siliconflow.cn/pricing read 2026-11-18 (highest applicable tier, no discount)"
+      }
+    },
+    {
+      "role": "vision",
+      "provider": "minimax",
+      "transport": "openai_chat_vision",
+      "endpoint": "/v1/chat/completions",
+      "base_url": "http://127.0.0.1:18710",
+      "model_request_name": "MiniMax-M3",
+      "version_state": "REQUESTED_ONLY",
+      "max_output_tokens": 2048,
+      "note": "MiniMax 官方通用图片输入协议：model+messages+image_url(detail=low)，thinking=disabled；M3.1-Flash 强制 thinking 且推理 token 无公开计量证据，故不作付费出口；专用 /v1/coding_plan/vlm 与通用字段不得混拼",
+      "pricing": {
+        "currency": "CNY",
+        "input_per_million": 4.2,
+        "output_per_million": 16.8,
+        "source": "https://platform.minimax.cn/docs/pricing/overview read 2026-11-18 (standard tier, <=512k, no discount)"
+      }
+    },
+    {
+      "role": "transcription",
+      "provider": "minimax",
+      "transport": "audio_transcriptions",
+      "endpoint": "/audio/transcriptions",
+      "base_url": "http://127.0.0.1:18710",
+      "model_request_name": "PLACEHOLDER-REQUESTED-ONLY",
+      "version_state": "REQUESTED_ONLY",
+      "max_output_tokens": 0,
+      "note": "无已批准的转写来源时声音证据如实缺失；已有字幕须标来源，不当听音验证",
+      "pricing": {
+        "currency": "CNY",
+        "input_per_million": null,
+        "output_per_million": null,
+        "source": null
+      }
+    }
+  ],
+  "materials": [
+    {
+      "key": "hxc-doufu",
+      "label": "葱烧豆腐",
+      "dataset_root": "<CANON_MATERIAL_ROOT>",
+      "video_path": "<CANON_VIDEO_PATH>",
+      "binding": {
+        "video_sha256": "75193214d5e30e018652c3c716d41ed20e92d439d54269104f77ed1dfdbd8176",
+        "comment_sha256": "1746b81abbc244e2362e9fe7865651b1ae6bea95d999e1c0b66a792c7039f619",
+        "danmaku_sha256": "8b2e0dc25ccfec58535aef1289555c70ca7bf9e51635e244ef39e97a47b0b709"
+      },
+      "service_probe": {
+        "host": "127.0.0.1",
+        "port": 18701
+      }
+    },
+    {
+      "key": "my-dragon",
+      "label": "如果龙真实存在",
+      "dataset_root": "<CANON_MATERIAL_ROOT>",
+      "video_path": "<CANON_VIDEO_PATH>",
+      "binding": {
+        "video_sha256": "3b97da0a82eba89db0507f3782b5d611b2c3b9dc1d48d1bb3492ad50620ef655",
+        "comment_sha256": "e8843fb6807c1bbc23e147ea82cd22d4b270273cfb6c480fcbb6aa208abfab2b",
+        "danmaku_sha256": "aef74187236fb4207a874fa57c00b1a05c3172a742ca971ab92f97531604fa78"
+      },
+      "service_probe": {
+        "host": "127.0.0.1",
+        "port": 18702
+      }
+    },
+    {
+      "key": "ysjf-canon",
+      "label": "佳能R5 Mark II评测",
+      "dataset_root": "<CANON_MATERIAL_ROOT>",
+      "video_path": "<CANON_VIDEO_PATH>",
+      "binding": {
+        "video_sha256": "1e9f5d4b28ff89c863a0c0e034a6a39c230dce318dbc2fe770df5be2b20ff53a",
+        "comment_sha256": "2ae4338d24c3af7cdbc22474dd19f4811e8f19a2e1fb46b508d83a6c2c4af0e1",
+        "danmaku_sha256": "7bb28506501be822a4dc84e59b6f3d5e9f635a57bf4f633d6f70a064c59f610f"
+      },
+      "service_probe": {
+        "host": "127.0.0.1",
+        "port": 18703
+      },
+      "task_window": {
+        "kind": "absolute",
+        "start": "2026-11-03 00:00:00",
+        "end": "2026-11-10 00:00:00"
+      },
+      "canon_window": {
+        "comments_in_window": 58,
+        "original_comments_in_window": 0,
+        "danmaku_in_window": 137,
+        "comment_by_date": {
+          "2026-11-03": 3,
+          "2026-11-04": 5,
+          "2026-11-05": 7,
+          "2026-11-06": 7,
+          "2026-11-07": 14,
+          "2026-11-08": 16,
+          "2026-11-09": 6
+        },
+        "danmaku_by_date": {
+          "2026-11-03": 15,
+          "2026-11-04": 14,
+          "2026-11-05": 15,
+          "2026-11-06": 26,
+          "2026-11-07": 28,
+          "2026-11-08": 27,
+          "2026-11-09": 12
+        },
+        "missing_time": 0
+      }
+    }
+  ]
+}

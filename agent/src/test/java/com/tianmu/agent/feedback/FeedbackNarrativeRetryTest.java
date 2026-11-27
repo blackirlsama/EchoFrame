@@ -16,6 +16,26 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 class FeedbackNarrativeRetryTest {
+    @Test void durableScheduleHonoursTheStatedIntervalAndRefusesWhatItCannotWait(){
+        // A stated interval inside the logical call is used exactly, so the durable retry and the
+        // row that recorded it can never disagree.
+        var stated=FeedbackAnalysisService.durableSchedule(1,3,2,10,
+                com.tianmu.agent.model.TransportFault.http(com.tianmu.agent.model.TransportFault.Kind.HTTP_429,429,3000,12));
+        assertEquals(3000,stated.waitMillis());assertTrue(stated.retryable());
+        // A minute is not truncatable: no wait is scheduled and the entry may not be retried.
+        var unpayable=FeedbackAnalysisService.durableSchedule(1,3,2,10,
+                com.tianmu.agent.model.TransportFault.http(com.tianmu.agent.model.TransportFault.Kind.HTTP_429,429,60_000,12));
+        assertEquals(0,unpayable.waitMillis());assertFalse(unpayable.retryable());
+        // A connection fault states no interval, so one short wait applies to all three roles.
+        var silent=FeedbackAnalysisService.durableSchedule(1,3,2,10,
+                com.tianmu.agent.model.TransportFault.of(com.tianmu.agent.model.TransportFault.Kind.CONNECT_FAILED,7));
+        assertEquals(500,silent.waitMillis());assertTrue(silent.retryable());
+        // Without a typed fault the historical ladder is unchanged, including its exhaustion.
+        assertEquals(4000,FeedbackAnalysisService.durableSchedule(2,3,2,10,null).waitMillis());
+        var exhausted=FeedbackAnalysisService.durableSchedule(3,3,2,10,null);
+        assertEquals(0,exhausted.waitMillis());assertFalse(exhausted.retryable());
+    }
+
     @Test void badProseIsNeverPublishedAndCorrectionKeepsAllMembers(@TempDir Path directory)throws Exception {
         var calls=new AtomicInteger();var json=new ObjectMapper().findAndRegisterModules();
         var jobs=new MemoryFeedbackJobStore();var objects=new FeedbackObjects(new FileObjectStore(directory),json);

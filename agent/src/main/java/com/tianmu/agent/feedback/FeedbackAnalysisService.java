@@ -18,6 +18,11 @@ public final class FeedbackAnalysisService {
     private final FeedbackTopicDirectory directory;
     private FeedbackResultCache resultCache;
     public void resultCache(FeedbackResultCache cache){this.resultCache=Objects.requireNonNull(cache);}
+    /** Business-date clock injection for the evaluation wiring (batch 3): ONLY the submit-time
+     *  30-day rule reads it. Defaults to the system clock, so production behavior is unchanged.
+     *  Execution deadlines and leases deliberately stay on the real clock and must not be frozen. */
+    private Clock clock=Clock.systemUTC();
+    public void clock(Clock value){this.clock=Objects.requireNonNull(value);}
     private final Map<UUID,Set<CancellationToken>> running=new ConcurrentHashMap<>();
     public int parallelism(){return policy.readParallelism();}
     public int dispatchSlots(FeedbackJobStore.Job job){return pipeline(job.request()) && job.phase()==Phase.ANALYZING && policy.readParallelism()>1 && store.completedRange(job.id(),0,0,1).size()==1?policy.readParallelism():1;}
@@ -42,7 +47,7 @@ public final class FeedbackAnalysisService {
     }
     public FeedbackJobStore.Job submit(UUID run,AccessScope owner,Request request,VideoContent.Facts video,Instant executionDeadline) {
         if(!owner.videoIds().contains(request.query().videoId()))throw new AgentException("FORBIDDEN","Video outside current authorization");
-        request.query().checkTime(Instant.now());source.authorize(owner,request.query().videoId());
+        request.query().checkTime(clock.instant());source.authorize(owner,request.query().videoId());
         if(!FeedbackCompression.representativeVersion(request.rulesVersion()) && request.grounding()==Grounding.VIDEO_GROUNDED && (video==null || video.videoId()!=request.query().videoId()
                 || request.videoStartMs()!=null && (video.startMs()!=request.videoStartMs() || video.endMs()!=request.videoEndMs())))
             throw new AgentException("INVALID_EVIDENCE","Read the required video evidence before starting analysis");
@@ -127,6 +132,7 @@ public final class FeedbackAnalysisService {
                 input=new Input(stored.kind(),stored.groups(),stored.kind()==WorkKind.CLASSIFY?List.of():stored.children(),(stored.kind()==WorkKind.MERGE && !stored.groups().isEmpty()) || stored.kind()==WorkKind.CLASSIFY && (!pipeline(j.request()) || FeedbackCompression.representativeVersion(j.request().rulesVersion()) || stored.groups().stream().anyMatch(g->g.source()==Source.DANMAKU))?j.video():null,stored.correction(),
                         work.kind()==WorkKind.CLASSIFY?(pipeline(j.request()) && policy.readParallelism()>1?directory.seeded(work,token):directory.before(work,token)):List.of());
                 com.tianmu.agent.harness.trace.TraceAttributes.apply(io.opentelemetry.api.trace.Span.current(),correctionAttributes(input));
+                com.tianmu.agent.evaluation.admission.EvaluationFeeGate.beforeFeedbackAttempt(work.attempts());
                 var claim=work;CallControl control=new CallControl(min(j.deadline(),Instant.now().plus(policy.modelTimeout())),token,new FeedbackBudget(store,work,governance.tokenReservation()),accountAttempt);
                 List<Proposal> proposals=null;boolean cacheHit=false;
                 String reuseKey=pipeline(j.request()) && resultCache!=null?resultCache.key(j,input):null;
@@ -162,6 +168,7 @@ public final class FeedbackAnalysisService {
             }
             finishWithRecovery(j,token);
         } catch(FeedbackCorrectionException e) {
+            com.tianmu.agent.evaluation.admission.EvaluationFeeGate.feedbackFailed(e.code(),diagnosticReason(e),diagnosticStage(work));
             com.tianmu.agent.harness.trace.TraceAttributes.apply(io.opentelemetry.api.trace.Span.current(),Map.of("analysis.result_accepted",false,"analysis.validation_issue",e.correction().issue()));
             if(token.cancelled())store.cancel(id);
             else if(work!=null && input!=null)store.retry(work,e.code(),retryAt(work),3,
@@ -169,11 +176,36 @@ public final class FeedbackAnalysisService {
             else store.fail(id,e.code());
             return Optional.of(e);
         } catch(AgentException e) {
+            // The compensation decision is made ONCE here, at the boundary that knows the typed
+            // cause and the durable job's remaining budget, and then used for the record, the
+            // enqueue time, the attempt ceiling, the stop cause and the trace. In evaluation mode
+            // the policy answers this same call; in production the same helper applies the
+            // historical three-attempt rule.
+            var fault=com.tianmu.agent.model.TransportFailure.faultOf(e);
+            var dispatchCall=com.tianmu.agent.model.TransportFailure.callOf(e);
             var j=store.get(id);
+            long remaining=j==null?-1:Math.max(0,Duration.between(Instant.now(),j.deadline()).toMillis());
+            var plan=work!=null && fault!=null
+                    ? com.tianmu.agent.evaluation.admission.EvaluationFeeGate.planAnalysisRetry(
+                            fault,dispatchCall,work.attempts(),governance.maxAttempts(),remaining)
+                    : null;
+            boolean compensated=plan!=null && plan.retryable();
+            if (work != null) com.tianmu.agent.evaluation.admission.EvaluationFeeGate.feedbackFailed(
+                    e.code(),plan!=null && !plan.retryable()?plan.reason():diagnosticReason(e),
+                    diagnosticStage(work),compensated);
+            if (plan != null) com.tianmu.agent.harness.trace.TraceAttributes.apply(
+                    io.opentelemetry.api.trace.Span.current(),Map.of(
+                            "analysis.retry_allowed",plan.retryable(),
+                            "analysis.retry_wait_ms",plan.delayMillis(),
+                            "analysis.retry_reason",plan.reason(),
+                            "analysis.retry_ceiling",plan.maxAttempts(),
+                            "analysis.deadline_remaining_ms",remaining));
             if(j!=null && reranked(j.request()) && work!=null && !token.cancelled()){
                 if("ANALYSIS_LEASE_LOST".equals(e.code()))return Optional.of(e);
                 if(Set.of("UNAUTHORIZED","AUTH_CONTEXT_EXPIRED","AUTHORIZATION_EXPIRED").contains(e.code()))
                     store.transitionClaim(work,Phase.WAITING_AUTH,null);
+                else if(plan!=null && !plan.retryable())
+                    store.transitionClaim(work,Phase.FAILED,plan.reason());
                 else if(Set.of("BUSINESS_TIMEOUT","BUSINESS_UNAVAILABLE","OBJECT_STORE_UNAVAILABLE","STORAGE_UNAVAILABLE").contains(e.code()))
                     store.retry(work,e.code(),retryAt(work),3);
                 else store.transitionClaim(work,Phase.FAILED,e.code());
@@ -182,8 +214,23 @@ public final class FeedbackAnalysisService {
             if(token.cancelled())store.cancel(id);
             else if(j!=null && Set.of("UNAUTHORIZED","AUTH_CONTEXT_EXPIRED","AUTHORIZATION_EXPIRED").contains(e.code()))
                 store.phase(id,reranked(j.request()) && observed!=null?observed.version():j.version(),Phase.WAITING_AUTH);
-            else if(work!=null && Set.of("MODEL_UNAVAILABLE","MODEL_ERROR","MODEL_CALL_TIMEOUT","INVALID_ANALYSIS","BUSINESS_TIMEOUT","BUSINESS_UNAVAILABLE","OBJECT_STORE_UNAVAILABLE","STORAGE_UNAVAILABLE").contains(e.code()))
-                store.retry(work,e.code(),retryAt(work),3);
+            else if(work!=null && plan!=null){
+                if(plan.retryable()){
+                    if(store.retry(work,e.code(),Instant.now().plusMillis(plan.delayMillis()),plan.maxAttempts()))
+                        return Optional.of(e);
+                    // The grant was recorded before the enqueue; if the fence refused it, seal the
+                    // envelope too so the unused grant cannot authorise a later unrelated attempt.
+                    com.tianmu.agent.evaluation.admission.EvaluationFeeGate.feedbackFailed(
+                            e.code(),plan.reason(),diagnosticStage(work),false);
+                    store.fail(id,plan.reason());
+                }
+                else store.fail(id,plan.reason());
+            }
+            else if(work!=null && Set.of("MODEL_UNAVAILABLE","MODEL_ERROR","MODEL_CALL_TIMEOUT","INVALID_ANALYSIS","BUSINESS_TIMEOUT","BUSINESS_UNAVAILABLE","OBJECT_STORE_UNAVAILABLE","STORAGE_UNAVAILABLE").contains(e.code())){
+                var schedule=durableSchedule(work.attempts(),governance.maxAttempts(),governance.retryStepSeconds(),governance.retryMaxDelaySeconds(),null,remaining);
+                if(schedule.retryable())store.retry(work,e.code(),Instant.now().plusMillis(schedule.waitMillis()),governance.maxAttempts());
+                else store.fail(id,schedule.reason());
+            }
             else store.fail(id,e.code());
             return Optional.of(e);
         } catch(RuntimeException e){org.slf4j.LoggerFactory.getLogger(getClass()).warn("feedback_work_failed job={} type={} location={}",id,e.getClass().getSimpleName(),Arrays.stream(e.getStackTrace()).filter(f->f.getClassName().startsWith("com.tianmu.")).limit(5).toList());
@@ -325,10 +372,42 @@ public final class FeedbackAnalysisService {
     static Correction nextCorrection(Input input,Correction correction){int round=input.correction()==null?1:input.correction().round()==0?0:input.correction().round()+1;return new Correction(correction.previousTopics(),correction.missing(),correction.duplicates(),correction.unknown(),correction.issue(),round);}
     static Map<String,Object> correctionAttributes(Input input){var c=input.correction();if(c==null)return Map.of("correction.state","NOT_APPLICABLE");var attrs=new HashMap<String,Object>();attrs.put("correction.state","REQUESTED");attrs.put("correction.kind",c.issue().startsWith("REPRESENTATIVE_")?"THEME_REVIEW":"ANALYSIS_VALIDATION");attrs.put("correction.round_state",c.round()==0?"LEGACY_UNKNOWN":"RECORDED");if(c.round()>0)attrs.put("correction.round",c.round());return attrs;}
     private Instant retryAt(FeedbackJobStore.Work work){
-        boolean retryable=work.attempts()<governance.maxAttempts();
-        long wait=retryable?Math.min(governance.retryMaxDelaySeconds(),work.attempts()*(long)governance.retryStepSeconds())*1000:0;
-        com.tianmu.agent.harness.trace.TraceAttributes.apply(io.opentelemetry.api.trace.Span.current(),Map.of("analysis.retry_wait_ms",wait,"execution.retryable",retryable));
-        return Instant.now().plusMillis(wait);
+        var schedule=durableSchedule(work.attempts(),governance.maxAttempts(),governance.retryStepSeconds(),
+                governance.retryMaxDelaySeconds(),null,-1);
+        com.tianmu.agent.harness.trace.TraceAttributes.apply(io.opentelemetry.api.trace.Span.current(),
+                Map.of("analysis.retry_wait_ms",schedule.waitMillis(),"execution.retryable",schedule.retryable()));
+        return Instant.now().plusMillis(schedule.waitMillis());
+    }
+    /**
+     * One durable retry decision: how long to wait, whether the entry may be retried at all, and the
+     * fixed reason when it may not. A wait that cannot be honoured is refused here rather than
+     * silently shortened; callers must use {@code retryable}, not just {@code waitMillis}.
+     */
+    record Schedule(long waitMillis,boolean retryable,String reason){}
+    static Schedule durableSchedule(int attempts,int maxAttempts,int stepSeconds,int maxDelaySeconds,
+            com.tianmu.agent.model.TransportFault fault,long remainingMillis){
+        boolean attemptsLeft=attempts<maxAttempts;
+        if(fault==null){
+            long wait=attemptsLeft?Math.min(maxDelaySeconds,attempts*(long)stepSeconds)*1000:0;
+            if(attemptsLeft && remainingMillis>=0 && wait>=remainingMillis)
+                return new Schedule(0,false,"RETRY_BEYOND_DEADLINE");
+            return new Schedule(wait,attemptsLeft,attemptsLeft?"RETRYABLE_BACKOFF":"ATTEMPTS_EXHAUSTED");
+        }
+        if(!fault.recoverable())
+            return new Schedule(0,false,"NOT_RECOVERABLE_"+fault.kind().name());
+        if(!attemptsLeft)
+            return new Schedule(0,false,"ATTEMPTS_EXHAUSTED");
+        long wait=com.tianmu.agent.model.ModelRecovery.compensationDelayMillis(fault,remainingMillis);
+        if(wait==com.tianmu.agent.model.ModelRecovery.UNPAYABLE_DELAY){
+            // The provider asked for longer than one logical call may wait. Never schedule a
+            // shortened retry: it would look like the provider's interval had been honoured.
+            return new Schedule(0,false,"RETRY_AFTER_BEYOND_WAIT_BUDGET");
+        }
+        return new Schedule(wait,true,"RECOVERABLE_"+fault.kind().name());
+    }
+    static Schedule durableSchedule(int attempts,int maxAttempts,int stepSeconds,int maxDelaySeconds,
+            com.tianmu.agent.model.TransportFault fault){
+        return durableSchedule(attempts,maxAttempts,stepSeconds,maxDelaySeconds,fault,-1);
     }
     private static String topicKey(Topic t){return t.id().substring(t.id().lastIndexOf(':')+1);}
     private static List<Topic> combine(List<Topic> topics){
@@ -554,6 +633,42 @@ public final class FeedbackAnalysisService {
         }
         if(!section.equals("topics"))throw new AgentException("INVALID_ARGUMENTS","Read summary, topics, children or originals");
         return page("topics",topics(asset),offset,limit,FeedbackAnalysisService::topicView);
+    }
+    /** Fixed-enum reason for the evaluation observer; never the raw exception text. */
+    private static String diagnosticReason(AgentException failure) {
+        if (failure instanceof FeedbackCorrectionException correction)
+            return safeReason(correction.correction().issue());
+        // Typed transport cause, when the client recorded one at the boundary that knew it. The
+        // fixed enum is already diagnostic-safe, so the reason does not depend on message prose or
+        // on trace details being enabled.
+        com.tianmu.agent.model.TransportFault fault = com.tianmu.agent.model.TransportFailure.faultOf(failure);
+        if (fault != null) return fault.kind().name();
+        String message = failure.getMessage() == null ? "" : failure.getMessage();
+        var provider = java.util.regex.Pattern.compile(
+                "^Provider analysis validation failed: ([A-Z0-9_]{1,64})(?:\\s.*)?$").matcher(message);
+        if (provider.matches()) return safeReason(provider.group(1));
+        String planner = "Planner rejected: ";
+        if (message.startsWith(planner)) return safeReason(message.substring(planner.length()));
+        return switch (message) {
+            case "Cached analysis failed current evidence validation" -> "CACHED_ANALYSIS_REJECTED";
+            case "No proposed topics passed evidence validation; no report was delivered" -> "CONFIRMATION_EMPTY";
+            case "Root coverage differs from snapshot" -> "ROOT_COVERAGE";
+            case "Bucket coverage differs from snapshot" -> "BUCKET_COVERAGE";
+            case "Report synthesis coverage differs from shared snapshot" -> "SYNTHESIS_COVERAGE";
+            case "Incomplete report writing" -> "REPORT_TOPIC_COUNT";
+            case "Unknown report topic" -> "REPORT_TOPIC_ALIAS";
+            case "Invalid report prose" -> "REPORT_PROSE";
+            case "Invalid confirmation schema" -> "CONFIRMATION_SCHEMA";
+            default -> "UNCLASSIFIED";
+        };
+    }
+    private static String diagnosticStage(FeedbackJobStore.Work work) {
+        return work == null ? "UNKNOWN" : work.kind().name() + ":" + work.ordinal() + ":attempt" + work.attempts();
+    }
+    private static String safeReason(String reason) {
+        if (reason == null) return "UNCLASSIFIED";
+        String text = reason.trim();
+        return text.matches("[A-Z0-9_]{1,64}") ? text : "UNCLASSIFIED";
     }
     private static Instant min(Instant a,Instant b){return a.isBefore(b)?a:b;}
 }

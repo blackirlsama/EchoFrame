@@ -29,7 +29,10 @@ public final class ToolArguments {
         DATE("Use YYYY-MM-DD with a valid calendar date."),
         ENUM("Use a value from the declared enum."), ARRAY("Use a native JSON array."),
         ARRAY_SIZE("Use an array within the declared item-count bounds."),
-        OBJECT("Use a JSON object with the declared fields.");
+        OBJECT("Use a JSON object with the declared fields."),
+        EVIDENCE_MIXED("Use either evidence_id alone or the per-source evidence ids, never both."),
+        EVIDENCE_REQUIRED("Provide the evidence ids for the sources selected for this task."),
+        EVIDENCE_SELECTION("Provide exactly the evidence ids for the sources selected for this task.");
         private final String hint;
         Problem(String hint) { this.hint=hint; }
         public String hint() { return hint; }
@@ -50,6 +53,22 @@ public final class ToolArguments {
     public static Validation inspect(ToolCall call, ToolDefinition definition) {
         var collector=new Collector();collector.object(call.arguments(),definition.inputSchema(),"");
         return new Validation(collector.issues,collector.truncated);
+    }
+    /**
+     * Evaluator-safe projection of the declared paths already carried by a rejection. Schema
+     * property names stay; generated array indexes collapse to {@code []}; anything outside the
+     * trusted path grammar becomes {@code $}. Unknown keys never reach an {@link Issue} in the
+     * first place, so no caller-supplied name can leak through here.
+     */
+    public static List<String> diagnosticPaths(Validation validation) {
+        var paths=new ArrayList<String>();
+        for(Issue issue:validation.issues())paths.add(diagnosticPath(issue.path()));
+        return List.copyOf(paths);
+    }
+    private static String diagnosticPath(String path) {
+        if(path==null || path.isBlank())return "$";
+        String collapsed=path.replaceAll("\\[[0-9]+]","[]");
+        return collapsed.matches("[A-Za-z0-9_.$\\[\\]]{1,128}")?collapsed:"$";
     }
     public static void validate(ToolCall call, ToolDefinition definition) {
         if(!inspect(call,definition).valid())throw invalid();

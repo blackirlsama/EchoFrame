@@ -58,8 +58,12 @@ class DeepSeekAdapterTest {
             finally { exchange.close(); }
         });
         server.start();
+        // Stage 4B-2A: the thinking field is chosen by the declared protocol, not by the model name.
+        // These cases verify the deepseek.com wire mapping, so they declare it; a loopback host under
+        // `auto` resolves to none and would silently send neither family's field.
         properties = new DeepSeekProperties(URI.create("http://127.0.0.1:" + server.getAddress().getPort()), "test-secret",
-                "deepseek-flash", "deepseek-v4-pro", Duration.ofMillis(300), 384, 1536);
+                "deepseek-flash", "deepseek-v4-pro", Duration.ofMillis(300), 384, 1536,
+                "deepseek-flash", true, "high", "low", 16384, "deepseek");
         client = new DeepSeekClient(properties, mapper);
     }
     @AfterEach void stop() { if (release != null) release.countDown(); server.stop(0); }

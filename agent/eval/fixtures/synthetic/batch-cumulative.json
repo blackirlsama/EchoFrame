@@ -1,0 +1,49 @@
+{
+  "schema": "fee-ledger-v2",
+  "total_fen": 100000,
+  "pause_fen": 10000,
+  "carried_in": {
+    "source": "synthetic public fixture",
+    "settled_fen": 560,
+    "retained_fen": 78
+  },
+  "batch_cap": {
+    "source": "synthetic public fixture",
+    "new_spend_cap_fen": 10000
+  },
+  "reservations": [
+    {
+      "reservation_id": "fee-synthetic-1",
+      "exit": "chat:127.0.0.1:synthetic",
+      "model": "synthetic",
+      "status": "SETTLED",
+      "reserved_fen": 5,
+      "usage_tokens": 10,
+      "actual_fen": 113,
+      "price_identity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "price_input_fen_per_million": 200,
+      "price_output_fen_per_million": 800,
+      "attribution": "direct",
+      "admitted_at": "2026-11-01T00:00:00Z",
+      "request_body_bytes": 10,
+      "request_body_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "reservation_id": "fee-synthetic-2",
+      "exit": "chat:127.0.0.1:synthetic",
+      "model": "synthetic",
+      "status": "FAILED_RETAINED",
+      "reserved_fen": 19,
+      "usage_tokens": null,
+      "actual_fen": null,
+      "price_identity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "price_input_fen_per_million": 200,
+      "price_output_fen_per_million": 800,
+      "attribution": "direct",
+      "admitted_at": "2026-11-01T00:00:00Z",
+      "request_body_bytes": 10,
+      "request_body_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "fail_reason": "SYNTHETIC_RETAINED"
+    }
+  ]
+}
